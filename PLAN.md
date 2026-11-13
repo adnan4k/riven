@@ -11,7 +11,7 @@ Work top to bottom; don't start a milestone until the previous one's gate passes
   - Done when: `composer install` succeeds and `vendor/bin/pest` runs (0 tests is fine)
 - [x] Testbench base `TestCase` that loads `RivenServiceProvider`
   - Done when: one smoke test asserts `RouteScanner` resolves from the container as a singleton
-- [ ] Host app wiring (`riven-app` path repo, symlinked)
+- [x] Host app wiring (`riven-app` path repo, symlinked)
   - Done when: `php artisan list` in `riven-app` shows the `riven` namespace
 
 **Gate:** tests run in the package and the host app sees the provider.
