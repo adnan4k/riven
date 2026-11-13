@@ -17,10 +17,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/faysal/riven/engine/manifest"
-	"github.com/faysal/riven/engine/report"
-	"github.com/faysal/riven/engine/stress"
-	"github.com/faysal/riven/engine/targets"
+	"github.com/adnan4k/riven/engine/manifest"
+	"github.com/adnan4k/riven/engine/report"
+	"github.com/adnan4k/riven/engine/stress"
+	"github.com/adnan4k/riven/engine/targets"
 )
 
 // guard protects endpoints that act (send requests, run load, run artisan).

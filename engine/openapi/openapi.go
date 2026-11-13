@@ -11,8 +11,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/faysal/riven/engine/manifest"
-	"github.com/faysal/riven/engine/rules"
+	"github.com/adnan4k/riven/engine/manifest"
+	"github.com/adnan4k/riven/engine/rules"
 )
 
 // Doc is the OpenAPI document as a generic map, so it serialises exactly

@@ -22,7 +22,7 @@ class EngineInstaller
 {
     public const PACKAGE = 'faysal/riven';
 
-    public const RELEASES_URL = 'https://github.com/faysal/riven/releases/download';
+    public const RELEASES_URL = 'https://github.com/adnan4k/riven/releases/download';
 
     public function __construct(
         private string $target,
@@ -45,7 +45,7 @@ class EngineInstaller
         if ($version === null || ! preg_match('/^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$/', $version)) {
             return InstallResult::skipped(
                 'faysal/riven is installed as '.($version ?? 'an unknown version').', which has no release binary. '
-                .'Build the engine from source instead, in the faysal/riven repository: cd engine && go build -o '.$this->target.' ./cmd/riven-engine'
+                .'Build the engine from source instead, in the faysal/riven repository (github.com/adnan4k/riven): cd engine && go build -o '.$this->target.' ./cmd/riven-engine'
             );
         }
 

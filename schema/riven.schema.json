@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/faysal/riven/schema/riven.schema.json",
+  "$id": "https://github.com/adnan4k/riven/schema/riven.schema.json",
   "title": "Riven manifest",
   "description": "Contract between the Riven PHP collector and the Riven engine. Additive changes are minor; renames or removals bump schema_version. Unknown values are null, never guessed.",
   "type": "object",

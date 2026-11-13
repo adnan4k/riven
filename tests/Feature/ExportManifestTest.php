@@ -10,7 +10,7 @@ use Riven\Tests\Fixtures\App\StoreUserAction;
 use Riven\Tests\Fixtures\App\UpdateUserRequest;
 use Riven\Tests\Fixtures\App\UserController;
 
-const SCHEMA_ID = 'https://github.com/faysal/riven/schema/riven.schema.json';
+const SCHEMA_ID = 'https://github.com/adnan4k/riven/schema/riven.schema.json';
 
 /**
  * Validation errors as readable text, or [] when the data matches the schema.

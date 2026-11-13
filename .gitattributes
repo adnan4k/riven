@@ -9,3 +9,7 @@
 /PLAN.md         export-ignore
 /CLAUDE.md       export-ignore
 /.gitattributes  export-ignore
+/.github         export-ignore
+/.goreleaser.yaml export-ignore
+/.gitignore      export-ignore
+/.qodo           export-ignore

@@ -12,7 +12,7 @@ import (
 	"testing/fstest"
 	"time"
 
-	"github.com/faysal/riven/engine/report"
+	"github.com/adnan4k/riven/engine/report"
 )
 
 const sample = "../testdata/riven-app.json"

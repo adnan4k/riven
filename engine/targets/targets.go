@@ -11,8 +11,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/faysal/riven/engine/manifest"
-	"github.com/faysal/riven/engine/stress"
+	"github.com/adnan4k/riven/engine/manifest"
+	"github.com/adnan4k/riven/engine/stress"
 )
 
 type Options struct {

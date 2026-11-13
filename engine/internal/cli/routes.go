@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/faysal/riven/engine/internal/table"
-	"github.com/faysal/riven/engine/manifest"
+	"github.com/adnan4k/riven/engine/internal/table"
+	"github.com/adnan4k/riven/engine/manifest"
 	"github.com/spf13/cobra"
 )
 

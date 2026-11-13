@@ -10,8 +10,8 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/faysal/riven/engine/server"
-	"github.com/faysal/riven/engine/web"
+	"github.com/adnan4k/riven/engine/server"
+	"github.com/adnan4k/riven/engine/web"
 	"github.com/spf13/cobra"
 )
 

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/faysal/riven/engine/manifest"
-	"github.com/faysal/riven/engine/openapi"
+	"github.com/adnan4k/riven/engine/manifest"
+	"github.com/adnan4k/riven/engine/openapi"
 	"github.com/spf13/cobra"
 )
 

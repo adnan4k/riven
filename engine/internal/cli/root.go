@@ -4,7 +4,7 @@ package cli
 
 import "github.com/spf13/cobra"
 
-// Version is set at build time: go build -ldflags "-X github.com/faysal/riven/engine/internal/cli.Version=v0.1.0".
+// Version is set at build time: go build -ldflags "-X github.com/adnan4k/riven/engine/internal/cli.Version=v0.1.0".
 var Version = "dev"
 
 // NewRootCommand builds a fresh command tree, so tests don't share flag state.

@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/faysal/riven/engine/internal/table"
-	"github.com/faysal/riven/engine/manifest"
-	"github.com/faysal/riven/engine/report"
-	"github.com/faysal/riven/engine/stress"
-	"github.com/faysal/riven/engine/targets"
+	"github.com/adnan4k/riven/engine/internal/table"
+	"github.com/adnan4k/riven/engine/manifest"
+	"github.com/adnan4k/riven/engine/report"
+	"github.com/adnan4k/riven/engine/stress"
+	"github.com/adnan4k/riven/engine/targets"
 	"github.com/spf13/cobra"
 )
 

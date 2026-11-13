@@ -56,7 +56,7 @@ return [
 
     'engine' => [
         'path' => null,
-        'releases_url' => 'https://github.com/faysal/riven/releases/download',
+        'releases_url' => 'https://github.com/adnan4k/riven/releases/download',
     ],
 
 ];

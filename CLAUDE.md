@@ -13,7 +13,7 @@ Two halves in this one repo (monorepo), connected by a JSON manifest:
 - **PHP collector** (repo root, `faysal/riven`, `src/`): runs inside the Laravel app.
   Does only what requires the app: scans routes, reflects controllers, reads
   FormRequest rules, Resource shapes, and middleware. Exports `riven.json`.
-- **Go engine** (`engine/`, module `github.com/faysal/riven/engine`, binary
+- **Go engine** (`engine/`, module `github.com/adnan4k/riven/engine`, binary
   `riven-engine`): reads the manifest. Handles
   stress testing (goroutines), Claude API analysis, OpenAPI building, test
   generation, and a React dashboard embedded via `go:embed`. Shipped as

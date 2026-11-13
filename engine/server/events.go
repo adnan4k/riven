@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/faysal/riven/engine/watch"
+	"github.com/adnan4k/riven/engine/watch"
 )
 
 // Event is pushed to open dashboards over Server-Sent Events.

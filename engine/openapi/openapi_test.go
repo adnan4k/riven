@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/faysal/riven/engine/manifest"
+	"github.com/adnan4k/riven/engine/manifest"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 

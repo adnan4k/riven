@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/faysal/riven/engine/manifest"
+	"github.com/adnan4k/riven/engine/manifest"
 )
 
 func ptr[T any](v T) *T { return &v }

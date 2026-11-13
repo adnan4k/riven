@@ -5,7 +5,7 @@ package main
 import (
 	"os"
 
-	"github.com/faysal/riven/engine/internal/cli"
+	"github.com/adnan4k/riven/engine/internal/cli"
 )
 
 func main() {

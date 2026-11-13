@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/faysal/riven/engine/manifest"
-	"github.com/faysal/riven/engine/stress"
+	"github.com/adnan4k/riven/engine/manifest"
+	"github.com/adnan4k/riven/engine/stress"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files in testdata/")

@@ -27,9 +27,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/faysal/riven/engine/manifest"
-	"github.com/faysal/riven/engine/openapi"
-	"github.com/faysal/riven/engine/report"
+	"github.com/adnan4k/riven/engine/manifest"
+	"github.com/adnan4k/riven/engine/openapi"
+	"github.com/adnan4k/riven/engine/report"
 )
 
 type Config struct {

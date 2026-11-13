@@ -1,4 +1,4 @@
-module github.com/faysal/riven/engine
+module github.com/adnan4k/riven/engine
 
 go 1.25.1
 

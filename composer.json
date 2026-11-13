@@ -1,8 +1,28 @@
 {
     "name": "faysal/riven",
-    "description": "A Laravel developer toolkit",
+    "description": "API docs, a request playground and load tests for Laravel, generated from your routes, FormRequest rules and API Resources.",
+    "keywords": [
+        "laravel",
+        "openapi",
+        "api-documentation",
+        "load-testing",
+        "stress-testing",
+        "formrequest",
+        "developer-tools"
+    ],
+    "homepage": "https://github.com/adnan4k/riven",
     "type": "library",
     "license": "MIT",
+    "authors": [
+        {
+            "name": "Faysal Mohammed",
+            "homepage": "https://github.com/adnan4k"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/adnan4k/riven/issues",
+        "source": "https://github.com/adnan4k/riven"
+    },
     "autoload": {
         "psr-4": {
             "Riven\\": "src/"
