@@ -43,6 +43,7 @@ class RouteScanner
     /**
      * @param  string[]  $excludedUris  Wildcard patterns matched with Str::is()
      * @param  ?string  $vendorPath  Routes whose action is defined under this path are skipped
+     * @param  string[]  $includedUris  If non-empty, only URIs matching one of these are kept
      */
     public function __construct(
         private Router $router,
@@ -50,6 +51,8 @@ class RouteScanner
         ?string $vendorPath = null,
         private ActionReflector $actions = new ActionReflector,
         private RulesExtractor $rules = new RulesExtractor,
+        private ResourceDetector $resources = new ResourceDetector,
+        private array $includedUris = [],
     ) {
         // Reflection reports resolved paths, so compare against a resolved path too.
         $this->vendorPath = $vendorPath === null ? null : (realpath($vendorPath) ?: $vendorPath);
@@ -63,7 +66,9 @@ class RouteScanner
         $this->warnings = [];
 
         $routes = collect($this->router->getRoutes()->getRoutes())
-            ->reject(fn (Route $route) => $this->isExcludedUri($route) || $this->isVendorAction($route))
+            ->reject(fn (Route $route) => ! $this->isIncludedUri($route)
+                || $this->isExcludedUri($route)
+                || $this->isVendorAction($route))
             ->map(fn (Route $route) => $this->describe($route))
             ->values()
             ->all();
@@ -88,6 +93,7 @@ class RouteScanner
             ...$this->middleware($route, $id),
             'parameters' => $this->parameters($route),
             'request' => $this->request($route, $id),
+            'response' => $this->resources->detect($route),
         ];
     }
 
@@ -220,6 +226,11 @@ class RouteScanner
         }
 
         return null;
+    }
+
+    private function isIncludedUri(Route $route): bool
+    {
+        return $this->includedUris === [] || Str::is($this->includedUris, $route->uri());
     }
 
     private function isExcludedUri(Route $route): bool

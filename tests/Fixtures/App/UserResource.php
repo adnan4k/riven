@@ -1,0 +1,7 @@
+<?php
+
+namespace Riven\Tests\Fixtures\App;
+
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class UserResource extends JsonResource {}

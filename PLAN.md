@@ -27,9 +27,9 @@ Work top to bottom; don't start a milestone until the previous one's gate passes
   - Done when: a fixture controller method with `StoreUserRequest $request` yields that class name
 - [x] FormRequest rules extraction (`rules()` output, string and array rule formats normalized)
   - Done when: rules appear in manifest shape; rules needing a live request are skipped with a `warnings[]` entry, not a crash
-- [ ] Resource detection: return type / `new XResource` / `XResource::collection` (best effort, static)
+- [x] Resource detection: return type / `new XResource` / `XResource::collection` (best effort, static)
   - Done when: fixture returns are detected; unknown → `null`, not a guess
-- [ ] Config file `config/riven.php` (publishable): include/exclude patterns, output path
+- [x] Config file `config/riven.php` (publishable): include/exclude patterns, output path
   - Done when: `vendor:publish --tag=riven-config` works and options are honored
 - [ ] `riven:export` writes `riven.json` matching the Manifest contract below
   - Done when: output validates against `schema/riven.schema.json` in a test
@@ -127,6 +127,10 @@ Field notes:
   live request (then a `rules_need_request` warning). Strings are Laravel's own syntax (`max:255`,
   `in:"a","b"`); rule objects without a string form appear as their class name, closures as `Closure`.
   Wildcard keys (`items.*.id`) are kept as-is.
+- `response`: `{resource, collection}`, both `null` when unknown (no guessing). From the declared
+  return type, else from every `return` in the action body (`new X`, `X::make`, `X::collection`,
+  through chained calls); all returns must agree. Named collections report the item resource
+  (`$collects`, else Laravel's `UserCollection` → `UserResource` naming rule).
 
 Open questions (decide before freezing v1):
 - Include Resource field shapes now, or leave for a later schema version?
@@ -145,3 +149,6 @@ Open questions (decide before freezing v1):
 | 2026-11-13 | Scanner binding resolves the HTTP kernel first | Middleware groups/aliases are synced to the router in the HTTP kernel constructor; Artisan never builds it, so `web` stayed unresolved |
 | 2026-11-13 | Rules stay raw Laravel strings; the Go engine maps them to JSON Schema | Laravel's syntax is already a stable, documented format; mapping once in Go (M4) avoids two parsers |
 | 2026-11-13 | FormRequests are instantiated with `new`, never resolved from the container; PHP warnings in `rules()` are thrown | The container validates FormRequests on resolve; warnings (e.g. `null->id`) would otherwise yield silently wrong rules depending on the caller's error handler |
+| 2026-11-13 | Resource detection uses `nikic/php-parser` (^5, new runtime dep) on the action's own `return`s; ambiguity → `null` | Already installed in every Laravel app (via Tinker/psysh); an AST with `use` resolution is reliable where token matching isn't; limited patterns keep it far from a full inference engine (Scramble) |
+| 2026-11-13 | Config: `include` / `exclude` URI patterns (exclude wins), `exclude_vendor` toggle, relative `output` path; read only in the provider's scanner binding | The scanner stays config-free and testable with plain arguments; one place maps config → constructor (named args) |
+| 2026-11-13 | AI fallback (M4, Go engine): providers `none` (default) / `ollama` / `anthropic`; choose-from-candidates schema; cached by source hash | Keeps Riven deterministic by default, free+private option via local models, constrained output prevents invented class names |
