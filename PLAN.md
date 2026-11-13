@@ -39,7 +39,7 @@ Work top to bottom; don't start a milestone until the previous one's gate passes
 ## M2 — Go engine skeleton (`engine/` in this repo)
 - [x] Go module in `engine/`, CLI framework choice (cobra vs stdlib `flag`), decide with reasons
   - Done when: `go test ./...` passes and `go run ./cmd/riven-engine --version` works
-- [ ] Manifest structs + loader with `schema_version` check
+- [x] Manifest structs + loader with `schema_version` check (`engine/manifest`)
   - Done when: loads the M1 output; rejects an unknown major version with a clear error
 - [ ] `riven-engine routes` prints routes
   - Done when: output matches `riven:scan` for the same app
@@ -163,3 +163,4 @@ Deferred (additive, no version bump needed):
 | 2026-11-13 | Manifest v1 frozen; `schema/riven.schema.json` is the source of truth, strict (`additionalProperties: false`); Resource shapes deferred | Strict schema makes contract drift fail tests instead of silently reaching the engine; deferred fields are additive |
 | 2026-11-13 | Monorepo: Go engine in `engine/` (module `github.com/faysal/riven/engine`), not a separate repo; `.gitattributes` export-ignores it | One place for both halves and the schema they share; a subdirectory because Go reads a root `vendor/` as Go vendoring, which Composer's `vendor/` breaks; Composer installs stay PHP-only (the binary is downloaded, M6) |
 | 2026-11-13 | Engine CLI uses Cobra; `internal/cli` only parses flags and prints, logic in its own packages | Several subcommands are planned (`routes`, `stress`, `docs`, `serve`) and Cobra gives per-command flags, help and completion; stdlib `flag` has no subcommands. Thin CLI layer keeps logic testable and the framework swappable |
+| 2026-11-13 | Go manifest types: JSON null → nil (pointers for scalars, nil map for `rules`); `schema_version` checked before full decode; unknown fields ignored | nil keeps "unknown" distinct from zero values (`{}` rules decode to an empty map, `null` to nil); version-first gives a clear error instead of a type error on an incompatible file; additive fields don't bump the version, so the engine must tolerate them (strictness stays in the PHP schema test) |
