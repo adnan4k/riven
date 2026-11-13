@@ -145,3 +145,12 @@ export interface StressState {
   error?: string
   live?: StressReport
 }
+
+export interface FakeResult {
+  route_id: string
+  form_request: string
+  bodies: unknown[]
+  invalid: number
+  errors: Record<string, string[]>
+  warnings: string[]
+}

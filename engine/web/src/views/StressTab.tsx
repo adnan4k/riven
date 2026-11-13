@@ -35,11 +35,13 @@ export function StressTab({ route, params, setParams, token, onRunSaved }: {
   const [users, setUsers] = useState(String(PRESETS.smoke.users))
   const [duration, setDuration] = useState(String(PRESETS.smoke.duration))
   const [threshold, setThreshold] = useState('400')
+  const [pool, setPool] = useState('50') // generated bodies to rotate through; '' = off
   const [state, setState] = useState<StressState | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const method = mainMethod(route)
   const writes = method !== 'GET'
+  const canGenerate = writes && method !== 'DELETE' && !!route.request.form_request
   const missing = route.parameters.filter((p) => p.required && !params[p.name]).map((p) => p.name)
   const running = state?.state === 'running'
   const live = state?.live
@@ -79,6 +81,7 @@ export function StressTab({ route, params, setParams, token, onRunSaved }: {
     try {
       const s = await postJSON<StressState>('/api/stress', {
         routes: [route.id], params, token, concurrency: Number(users), duration_s: Number(duration),
+        fake_bodies: canGenerate ? Number(pool) || 0 : 0,
       })
       setState(s)
     } catch (e) {
@@ -113,6 +116,17 @@ export function StressTab({ route, params, setParams, token, onRunSaved }: {
                 onChange={(v) => setParams({ ...params, [p.name]: v })} suffix="" mono placeholder={p.required ? 'required' : 'optional'} />
             ))}
           </div>
+
+          {canGenerate && (
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <Label htmlFor="pool" className="text-muted-foreground">Generate test data from the rules</Label>
+              <div className="relative w-28">
+                <Input id="pool" value={pool} onChange={(e) => setPool(e.target.value)} inputMode="numeric" className="pr-14 font-mono" />
+                <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 font-mono text-xs text-muted-foreground">bodies</span>
+              </div>
+              <span className="text-xs text-muted-foreground">Requests rotate through them, so unique fields don't repeat. 0 sends no body.</span>
+            </div>
+          )}
 
           {writes && (
             <Alert>

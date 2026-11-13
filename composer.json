@@ -20,7 +20,8 @@
         "illuminate/http": "^11.0|^12.0|^13.0",
         "illuminate/process": "^11.0|^12.0|^13.0",
         "illuminate/support": "^11.0|^12.0|^13.0",
-        "nikic/php-parser": "^5.0"
+        "nikic/php-parser": "^5.0",
+        "fakerphp/faker": "^1.23"
     },
     "extra": {
         "laravel": {

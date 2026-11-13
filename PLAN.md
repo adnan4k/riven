@@ -57,7 +57,8 @@ Work top to bottom; don't start a milestone until the previous one's gate passes
   - Done when: exact percentiles/RPS/error rate on fixed results in tests; real timeouts and refused connections classified; table printed for riven-app
 - [x] JSON report output (consumed later by the dashboard) (`engine/report`, `riven-engine stress -o report.json`)
   - Done when: run against `riven-app` locally produces a report; a test uses `httptest.Server`
-- [ ] Request bodies for routes with rules (generate from rules or `--body`), after M4's rule mapping; so POST/PUT don't just measure 422s
+- [x] Request bodies for routes with rules: `php artisan riven:fake-body` (Faker shaped by the rules, real rows for `exists:`, fresh values for `unique:`, checked with Laravel's Validator, read-only); dashboard "Generate test data" in Try it, and stress runs rotate through a generated pool
+  - Done when: generated bodies pass the fixture FormRequest's real rules (20/20 repeated runs); a POST stress run on riven-app with 20 generated bodies answers 201 ×20
 
 **Gate:** `riven-engine stress -o` on riven-app prints metrics and writes a versioned report; the request-body task is deferred until M4's rule mapping. ✅ passed 2026-11-13
 
@@ -78,6 +79,8 @@ Work top to bottom; don't start a milestone until the previous one's gate passes
 - [x] Endpoint explorer layout (user's mockups): top bar (search ⌘K, target, Rescan), grouped route sidebar with status dots, endpoint page with tabs: Docs & Try it, Stress test (run from the UI, live), History
   - Done when: Try it, Rescan and a UI-started stress run work against riven-app; server tests cover the guard (non-JSON, foreign Origin, rebinding Host) and one-run-at-a-time
 - [ ] Later (needs Laravel-side instrumentation or AI): AI summary, Generated tests, Laravel insights (N+1, deadlocks, query count), fill from factory, DB transaction rollback, throttle bypass, ramp-up profiles
+- [x] Live route pickup: `serve` watches the app's PHP files (routes/, app/, config/, bootstrap/), re-runs `riven:export` after a quiet period, and pushes `manifest` / `scan` events to dashboards over SSE (`/api/events`); `--watch=false` turns it off
+  - Done when: adding a route in riven-app shows up without a click; export errors appear in the dashboard
 - [ ] Color pass (dark mode is the default for now)
 
 ## M6 — Ship
@@ -198,3 +201,5 @@ Deferred (additive, no version bump needed):
 | 2026-11-13 | Stress results get a per-second `timeline` (report v1, additive) and a thread-safe `stress.Live` recorder for live views | Latency-over-time charts for live and saved runs from the same data |
 | 2026-11-13 | Dashboard on React 19, dark mode by default | shadcn components are written for React 19 (ref as a prop); on 18 refs were silently dropped |
 | 2026-11-13 | Engine install = `riven:install-engine` artisan command run from the app's `post-autoload-dump` script, not a Composer plugin; downloads `riven-engine_<ver>_<os>_<arch>` + `checksums.txt` from the GitHub release matching the installed package version, verifies sha256 before unpacking, installs atomically to `vendor/bin/riven-engine`; dev versions are skipped with build instructions | Composer 2.2+ asks users to trust plugins and they run before the app exists; an artisan command is testable with `Http::fake`/`Process::fake`, rerunnable by hand, and a script hook is one line in the README; never installing an unverified file is the point of the checksum |
+| 2026-11-13 | Live updates: poll file mtimes (1s, 500ms debounce, `engine/watch`) instead of fsnotify; push to the browser with Server-Sent Events | Polling is dependency-free, identical on every OS and cheap at app sizes; SSE is one-way, plain HTTP, auto-reconnecting in the browser, and fits "server tells dashboard to reload" better than WebSockets |
+| 2026-11-13 | Test data without AI first: rule-shaped Faker values generated in the app (`src/Faking/BodyFaker.php`), validated with the app's own rules; model factories not used | Only the app knows its tables and rule objects (enums, Password); the Validator turns "probably valid" into checked; factories' `definition()` can call `X::factory()` which inserts rows, and the generator must only read. AI (Ollama/Chrome built-in) comes later, for fields whose meaning matters |

@@ -22,6 +22,9 @@ type Target struct {
 	URL    string
 	Header http.Header
 	Body   []byte
+	// Bodies, if set, replaces Body: each request to this target takes the
+	// next one in turn, e.g. generated test data so unique fields don't repeat.
+	Bodies [][]byte
 }
 
 // Config controls the load. At least one of Requests or Duration must be set;
@@ -119,7 +122,9 @@ func Run(ctx context.Context, client *http.Client, cfg Config, targets []Target)
 				}
 
 				i := int(n % int64(len(targets)))
-				r := send(ctx, client, targets[i])
+				// The k-th request to this target (round-robin keeps them evenly spread).
+				k := n / int64(len(targets))
+				r := send(ctx, client, targets[i], k)
 				if ctx.Err() != nil {
 					return
 				}
@@ -142,10 +147,14 @@ func Run(ctx context.Context, client *http.Client, cfg Config, targets []Target)
 	return results, ctx.Err()
 }
 
-func send(ctx context.Context, client *http.Client, t Target) Result {
+func send(ctx context.Context, client *http.Client, t Target, k int64) Result {
+	payload := t.Body
+	if len(t.Bodies) > 0 {
+		payload = t.Bodies[k%int64(len(t.Bodies))]
+	}
 	var body io.Reader
-	if t.Body != nil {
-		body = bytes.NewReader(t.Body)
+	if payload != nil {
+		body = bytes.NewReader(payload)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, t.Method, t.URL, body)

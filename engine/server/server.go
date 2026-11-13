@@ -8,6 +8,7 @@
 //	POST /api/try            send one request to the app (Try it)
 //	GET|POST /api/stress     live state of / start a stress run; POST /api/stress/stop
 //	POST /api/rescan         run php artisan riven:export
+//	POST /api/fake           generate request bodies from a route's rules (riven:fake-body)
 //	GET /api/events          Server-Sent Events: manifest changed, scan running/done/failed
 //
 // Every other path serves the embedded dashboard (index.html for unknown
@@ -66,6 +67,7 @@ func New(cfg Config) *Server {
 	mux.HandleFunc("POST /api/stress/stop", s.guard(s.stopStress))
 	mux.HandleFunc("POST /api/rescan", s.guard(s.rescan))
 	mux.HandleFunc("GET /api/events", s.events)
+	mux.HandleFunc("POST /api/fake", s.guard(s.fakeBody))
 	mux.HandleFunc("GET /api/manifest", s.manifest)
 	mux.HandleFunc("GET /api/openapi", s.openapi)
 	mux.HandleFunc("GET /api/reports", s.reports)

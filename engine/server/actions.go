@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -203,6 +202,9 @@ type stressRequest struct {
 	Concurrency int               `json:"concurrency"`
 	DurationS   int               `json:"duration_s"`
 	Requests    int               `json:"requests"`
+	// FakeBodies > 0 generates that many bodies per route with riven:fake-body,
+	// and requests rotate through them (so unique: fields don't repeat).
+	FakeBodies int `json:"fake_bodies"`
 }
 
 // run is the one stress run the dashboard can have at a time.
@@ -261,6 +263,27 @@ func (s *srv) startStress(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
+	}
+	if req.FakeBodies < 0 || req.FakeBodies > maxFakeBodies {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("generated bodies must be between 0 and %d", maxFakeBodies))
+		return
+	}
+	if req.FakeBodies > 0 {
+		for i := range plan.Targets {
+			t := &plan.Targets[i]
+			if t.Method == http.MethodGet || t.Method == http.MethodHead || t.Method == http.MethodDelete {
+				continue
+			}
+			res, err := s.fake(r.Context(), t.Name, req.FakeBodies)
+			if err != nil {
+				writeError(w, http.StatusUnprocessableEntity, "test data for "+t.Name+": "+err.Error())
+				return
+			}
+			for _, b := range res.Bodies {
+				t.Bodies = append(t.Bodies, []byte(b))
+			}
+			t.Header.Set("Content-Type", "application/json")
+		}
 	}
 
 	s.runs.mu.Lock()
@@ -407,24 +430,18 @@ func (s *srv) export(ctx context.Context) (string, error) {
 	defer s.exportMu.Unlock()
 	s.hub.publish(Event{Type: "scan", State: "running"})
 
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "php", "artisan", "riven:export", "--no-ansi", "--output="+s.cfg.ManifestPath)
-	cmd.Dir = s.cfg.AppDir
-	var out bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &out, &out
-
-	if err := cmd.Run(); err != nil {
-		msg := err.Error()
+	stdout, stderr, err := s.artisan(ctx, 2*time.Minute, "riven:export", "--output="+s.cfg.ManifestPath)
+	if err != nil {
+		msg := strings.TrimSpace(stderr + "\n" + stdout)
 		var exit *exec.ExitError
-		if errors.As(err, &exit) {
-			msg = strings.TrimSpace(out.String())
+		if !errors.As(err, &exit) || msg == "" {
+			msg = err.Error()
 		}
 		err = errors.New("riven:export failed: " + msg)
 		s.hub.publish(Event{Type: "scan", State: "failed", Message: err.Error()})
 		return "", err
 	}
-	output := strings.TrimSpace(out.String())
+	output := strings.TrimSpace(stdout)
 	s.hub.publish(Event{Type: "scan", State: "done", Message: output})
 	return output, nil
 }

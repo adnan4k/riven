@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
-import { Check, Copy, Loader2, Send } from 'lucide-react'
+import { Check, Copy, Loader2, Send, Sparkles } from 'lucide-react'
 import { postJSON } from '@/api'
-import type { Operation, Route, TryResponse } from '@/types'
+import type { FakeResult, Operation, Route, TryResponse } from '@/types'
 import { bytes, ms, short } from '@/format'
 import { curl, example, fillPath, flatten, mainMethod, typeOf, type Field } from '@/lib/routes'
 import { Status } from '@/components/Method'
@@ -47,11 +47,6 @@ export function DocsTab({ route, op, baseUrl, params, setParams, token, setToken
               <Alert><AlertDescription>These rules need a live request (route parameters, the current user…), so the fields can't be read statically.</AlertDescription></Alert>
             ) : (
               <ParamTable fields={fields.length ? fields : query} />
-            )}
-            {body?.['x-riven-unmapped-rules'] && (
-              <p className="text-xs text-muted-foreground">
-                Checked by Laravel but not expressible as a type: {body['x-riven-unmapped-rules'].map((r) => <code key={r} className="mr-2 font-mono">{r}</code>)}
-              </p>
             )}
           </section>
         ) : (
@@ -131,6 +126,7 @@ function TryIt({ route, method, baseUrl, schema, params, setParams, token, setTo
   const [body, setBody] = useState(initialBody)
   const [result, setResult] = useState<{ state: 'idle' } | { state: 'sending' } | { state: 'ok'; res: TryResponse } | { state: 'error'; message: string }>({ state: 'idle' })
   const [copied, setCopied] = useState(false)
+  const [gen, setGen] = useState<{ busy: boolean; notes: string[] }>({ busy: false, notes: [] })
 
   const sendsBody = method !== 'GET' && method !== 'HEAD' && method !== 'DELETE'
   const path = fillPath(route, params)
@@ -150,6 +146,20 @@ function TryIt({ route, method, baseUrl, schema, params, setParams, token, setTo
     }
   }
 
+  // Generates a body from the route's rules in the app (riven:fake-body):
+  // Faker values, real rows for exists:, fresh values for unique:.
+  async function generate() {
+    setGen({ busy: true, notes: [] })
+    try {
+      const res = await postJSON<FakeResult>('/api/fake', { route_id: route.id, count: 1 })
+      setBody(JSON.stringify(res.bodies[0] ?? {}, null, 2))
+      const failed = Object.entries(res.errors ?? {}).map(([f, m]) => `${f}: ${m[0]}`)
+      setGen({ busy: false, notes: [...res.warnings, ...failed] })
+    } catch (e) {
+      setGen({ busy: false, notes: [(e as Error).message] })
+    }
+  }
+
   async function copyCurl() {
     try {
       await navigator.clipboard.writeText(curl(method, baseUrl.replace(/\/$/, '') + path, headers, sendsBody ? body : ''))
@@ -163,7 +173,11 @@ function TryIt({ route, method, baseUrl, schema, params, setParams, token, setTo
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold">Request</h2>
         <div className="flex gap-2">
-          {schema && <Button variant="outline" size="sm" onClick={() => setBody(initialBody)}>Reset example</Button>}
+          {sendsBody && route.request.form_request && (
+            <Button variant="outline" size="sm" onClick={generate} disabled={gen.busy}>
+              {gen.busy ? <Loader2 className="animate-spin" /> : <Sparkles />}Generate test data
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={copyCurl}>{copied ? <Check /> : <Copy />}{copied ? 'Copied' : 'Copy cURL'}</Button>
         </div>
       </div>
@@ -187,6 +201,11 @@ function TryIt({ route, method, baseUrl, schema, params, setParams, token, setTo
           <Textarea id="try-body" aria-label="Request body (JSON)" value={body} onChange={(e) => setBody(e.target.value)}
             spellCheck={false} className="min-h-56 font-mono text-sm" placeholder="{ }" />
           {bodyError && <p className="text-xs text-red-600 dark:text-red-400">Invalid JSON: {bodyError}</p>}
+          {gen.notes.length > 0 && (
+            <ul className="flex flex-col gap-0.5 text-xs text-amber-700 dark:text-amber-400">
+              {gen.notes.map((n) => <li key={n}>{n}</li>)}
+            </ul>
+          )}
         </div>
       )}
 

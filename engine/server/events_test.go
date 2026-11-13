@@ -78,7 +78,7 @@ func fakeApp(t *testing.T) (dir, manifestPath string) {
 	os.WriteFile(filepath.Join(dir, "routes/web.php"), []byte("<?php"), 0o644)
 	os.WriteFile(filepath.Join(dir, "artisan"), []byte(`<?php
 if (file_exists(__DIR__.'/routes/broken.php')) { fwrite(STDERR, "Parse error in routes/broken.php"); exit(1); }
-$out = substr($argv[3], strlen('--output='));
+$out = substr(current(array_filter($argv, fn ($a) => str_starts_with($a, '--output='))), strlen('--output='));
 file_put_contents($out, json_encode(['routes' => glob(__DIR__.'/routes/*.php'), 'at' => microtime(true)]));
 echo "Wrote $out";`), 0o644)
 	return dir, filepath.Join(dir, "riven.json")

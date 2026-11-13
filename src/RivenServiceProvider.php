@@ -5,9 +5,11 @@ namespace Riven;
 use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Support\ServiceProvider;
 use Riven\Commands\ExportManifestCommand;
+use Riven\Commands\FakeBodyCommand;
 use Riven\Commands\InstallEngineCommand;
 use Riven\Commands\ScanRoutesCommand;
 use Riven\Engine\EngineInstaller;
+use Riven\Faking\BodyFaker;
 use Riven\Scanner\ActionReflector;
 use Riven\Scanner\ResourceDetector;
 use Riven\Scanner\RouteScanner;
@@ -41,6 +43,9 @@ class RivenServiceProvider extends ServiceProvider
             );
         });
 
+        // Faker\Generator is bound by Laravel (respects app.faker_locale).
+        $this->app->bind(BodyFaker::class, fn ($app) => new BodyFaker($app->make(\Faker\Generator::class)));
+
         $this->app->bind(EngineInstaller::class, fn ($app) => new EngineInstaller(
             target: $app['config']['riven.engine.path'] ?? $app->basePath('vendor/bin/riven-engine'.(PHP_OS_FAMILY === 'Windows' ? '.exe' : '')),
             releasesUrl: $app['config']['riven.engine.releases_url'] ?? EngineInstaller::RELEASES_URL,
@@ -56,6 +61,7 @@ class RivenServiceProvider extends ServiceProvider
                 ScanRoutesCommand::class,
                 ExportManifestCommand::class,
                 InstallEngineCommand::class,
+                FakeBodyCommand::class,
             ]);
         }
     }

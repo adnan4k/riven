@@ -32,6 +32,18 @@ func app(t *testing.T, delay time.Duration) (*httptest.Server, *atomic.Int64) {
 	return srv, &hits
 }
 
+// newApp is a stand-in app that reports each request to fn; returns its URL.
+func newApp(t *testing.T, fn func(r *http.Request, body string)) string {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		fn(r, string(b))
+		w.WriteHeader(http.StatusCreated)
+	}))
+	t.Cleanup(srv.Close)
+	return srv.URL
+}
+
 func post(t *testing.T, h http.Handler, path, body string, mutate ...func(*http.Request)) (int, string) {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
@@ -205,7 +217,7 @@ func TestRescanRunsArtisanExport(t *testing.T) {
 	dir := t.TempDir()
 	// A fake artisan that just writes the --output file it was given.
 	os.WriteFile(filepath.Join(dir, "artisan"), []byte(`<?php
-$out = substr($argv[3], strlen('--output='));
+$out = substr(current(array_filter($argv, fn ($a) => str_starts_with($a, '--output='))), strlen('--output='));
 file_put_contents($out, '{"ok":true}');
 echo "Wrote $out";`), 0o644)
 	manifestPath := filepath.Join(dir, "riven.json")

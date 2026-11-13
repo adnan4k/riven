@@ -38,6 +38,27 @@ class RulesExtractor
      */
     public function extract(string $formRequest): array
     {
+        return array_map(
+            fn (array $rules) => array_values(array_filter(
+                array_merge(...array_map(fn ($r) => $this->stringify($r), $rules)) ?: [],
+                fn (string $r) => $r !== '',
+            )),
+            $this->raw($formRequest),
+        );
+    }
+
+    /**
+     * rules() as written, one list per field: pipe strings are split, rule
+     * objects (Rule::enum(), Password…) are kept, for callers that need more
+     * than the string form (e.g. generating test data).
+     *
+     * @param  class-string  $formRequest
+     * @return array<string, list<mixed>>
+     *
+     * @throws Throwable when rules() can't run outside a live request
+     */
+    public function raw(string $formRequest): array
+    {
         // Not resolved through the container on purpose: Laravel validates a
         // FormRequest as soon as the container resolves it.
         $request = new $formRequest;
@@ -61,24 +82,11 @@ class RulesExtractor
             restore_error_handler();
         }
 
-        return array_map(fn ($rule) => $this->normalize($rule), $rules);
-    }
-
-    /**
-     * @return string[]
-     */
-    private function normalize(mixed $rule): array
-    {
-        // A whole-field string is pipe-delimited; strings inside an array are one rule each.
-        $parts = is_string($rule) ? explode('|', $rule) : (is_array($rule) ? $rule : [$rule]);
-
-        $rules = [];
-
-        foreach ($parts as $part) {
-            array_push($rules, ...$this->stringify($part));
-        }
-
-        return array_values(array_filter($rules, fn (string $r) => $r !== ''));
+        return array_map(
+            // A whole-field string is pipe-delimited; strings inside an array are one rule each.
+            fn ($rule) => is_string($rule) ? explode('|', $rule) : (is_array($rule) ? array_values($rule) : [$rule]),
+            $rules,
+        );
     }
 
     /**

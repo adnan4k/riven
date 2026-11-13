@@ -7,6 +7,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -220,5 +222,27 @@ func TestRejectsBadConfig(t *testing.T) {
 		if _, err := Run(context.Background(), http.DefaultClient, tc.cfg, tc.ts); err == nil {
 			t.Errorf("%s: want an error", name)
 		}
+	}
+}
+
+func TestBodiesRotatePerTarget(t *testing.T) {
+	var got []string
+	var mu sync.Mutex
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		got = append(got, r.URL.Path+" "+string(b))
+		mu.Unlock()
+	}))
+	defer s.Close()
+
+	run(t, Config{Concurrency: 1, Requests: 6}, []Target{
+		{Method: "POST", URL: s.URL + "/a", Bodies: [][]byte{[]byte("a1"), []byte("a2")}},
+		{Method: "POST", URL: s.URL + "/b", Body: []byte("b")},
+	})
+
+	want := []string{"/a a1", "/b b", "/a a2", "/b b", "/a a1", "/b b"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("got %v, want %v", got, want)
 	}
 }
