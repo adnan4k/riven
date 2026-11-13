@@ -4,6 +4,8 @@ import type { Stats, StressReport } from '@/types'
 import { Link, routePath } from '@/router'
 import { ms, pct, when } from '@/format'
 import { Status } from '@/components/Method'
+import { ChartLegend, LatencyChart } from '@/components/LatencyChart'
+import { StatusBar } from '@/components/StatusBar'
 import { Stat, StatGrid } from '@/components/Stat'
 import { Section } from './Section'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -45,6 +47,16 @@ export function ReportDetail({ name }: { name: string }) {
         <Stat label="p99" value={ms(s.latency_ms?.p99)} />
         <Stat label="Failed" value={pct(s.error_rate)} tone={s.error_rate > 0 ? 'bad' : undefined} />
       </StatGrid>
+
+      {r.timeline?.length > 1 && (
+        <Section title="Latency over time" action={<ChartLegend />}>
+          <LatencyChart points={r.timeline} />
+        </Section>
+      )}
+
+      <Section title="Status codes">
+        <StatusBar statuses={s.statuses} errors={s.errors} />
+      </Section>
 
       <Section
         title="Per route"

@@ -75,6 +75,10 @@ Work top to bottom; don't start a milestone until the previous one's gate passes
 - [x] Views: routes list, route detail (docs), stress reports (shadcn/ui)
 
 **Gate:** `riven-engine serve` in riven-app shows routes, docs and saved stress reports. ✅ passed 2026-11-13
+- [x] Endpoint explorer layout (user's mockups): top bar (search ⌘K, target, Rescan), grouped route sidebar with status dots, endpoint page with tabs: Docs & Try it, Stress test (run from the UI, live), History
+  - Done when: Try it, Rescan and a UI-started stress run work against riven-app; server tests cover the guard (non-JSON, foreign Origin, rebinding Host) and one-run-at-a-time
+- [ ] Later (needs Laravel-side instrumentation or AI): AI summary, Generated tests, Laravel insights (N+1, deadlocks, query count), fill from factory, DB transaction rollback, throttle bypass, ramp-up profiles
+- [ ] Color pass (dark mode is the default for now)
 
 ## M6 — Ship
 - [ ] (deferred with the AI work) AI test generator (Pest tests from manifest + docs), with an eval like M4
@@ -189,3 +193,6 @@ Deferred (additive, no version bump needed):
 | 2026-11-13 | Dashboard: `riven-engine serve` (127.0.0.1 by default) with a JSON API that re-reads files per request; reports opened via `os.Root`; React app in `engine/web`, built into `web/dist` (not committed) and embedded with `go:embed`; UI uses shadcn/ui (radix, Tailwind v4, default neutral theme, light mode) with its Sidebar | Local tool showing app internals, so local-only by default; `os.Root` blocks path traversal; embedding keeps one binary; shadcn gives accessible, consistent components we own as source |
 | 2026-11-13 | Releases: GoReleaser on a `v*` tag builds linux/darwin/windows × amd64/arm64, `CGO_ENABLED=0`, version from the tag via ldflags, archives `riven-engine_<ver>_<os>_<arch>.tar.gz` (.zip on Windows), sha256 `checksums.txt`, draft release; one tag versions both halves | Static binaries run on any distro; a predictable name + checksum file is all the Composer installer needs; draft lets a human check assets before publishing; one version number means the installer can derive the binary version from the Composer package |
 | 2026-11-13 | Package identity is `faysal/riven` (Composer name, Go module `github.com/faysal/riven/engine`, schema `$id`, manifest `generator.name`); releases are downloaded from github.com/faysal/riven | Owner's choice; Composer name, Go module and release URL must agree, so the GitHub repo has to live at faysal/riven (the current git remote is adnan4k/riven) |
+| 2026-11-13 | Dashboard can act: `POST /api/try` (proxy, app base URL only), `POST /api/stress` + polling `GET /api/stress` (one run at a time, saved as a report), `POST /api/rescan` (runs `php artisan riven:export`); all POSTs require JSON, a same-origin Origin and a loopback Host | The browser can't call the app (CORS), so the engine proxies; JSON-only + Origin + Host checks stop other websites and DNS rebinding from driving a localhost tool that sends load and runs artisan |
+| 2026-11-13 | Stress results get a per-second `timeline` (report v1, additive) and a thread-safe `stress.Live` recorder for live views | Latency-over-time charts for live and saved runs from the same data |
+| 2026-11-13 | Dashboard on React 19, dark mode by default | shadcn components are written for React 19 (ref as a prop); on 18 refs were silently dropped |

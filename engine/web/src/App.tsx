@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Activity, RefreshCw, Search } from 'lucide-react'
-import { getJSON, postJSON, useJSON } from '@/api'
+import { postJSON, useJSON } from '@/api'
 import { Link, routePath, usePath } from '@/router'
 import type { AppConfig, Manifest, OpenAPIDoc, ReportSummary, RouteStats, StressReport } from '@/types'
 import { ago } from '@/format'
@@ -130,7 +130,7 @@ function TopBar({ appName, baseUrl, canRescan, rescanning, onRescan, query, onQu
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4">
       <Link to="/" className="flex items-center gap-2 font-semibold">
-        <Activity className="size-5 text-sky-600" aria-hidden="true" />
+        <Activity className="size-5 text-sky-600 dark:text-sky-400" aria-hidden="true" />
         Riven
       </Link>
       {appName && <Badge variant="outline" className="hidden rounded-full font-normal sm:inline-flex">{appName}</Badge>}

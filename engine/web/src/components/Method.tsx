@@ -3,11 +3,11 @@ import { cn } from '@/lib/utils'
 
 // Method colors are placeholders until the color pass.
 const methodColor: Record<string, string> = {
-  GET: 'text-sky-600',
-  POST: 'text-amber-600',
-  PUT: 'text-violet-600',
-  PATCH: 'text-violet-600',
-  DELETE: 'text-red-600',
+  GET: 'text-sky-600 dark:text-sky-400',
+  POST: 'text-amber-600 dark:text-amber-400',
+  PUT: 'text-violet-600 dark:text-violet-400',
+  PATCH: 'text-violet-600 dark:text-violet-400',
+  DELETE: 'text-red-600 dark:text-red-400',
 }
 
 // MethodText is the plain colored label used in lists ("GET   /api/orders").
@@ -38,9 +38,9 @@ export function statusTone(code: string) {
 }
 
 const toneClass = {
-  good: 'bg-emerald-500/10 text-emerald-700',
-  warn: 'bg-amber-500/10 text-amber-700',
-  bad: 'bg-red-500/10 text-red-700',
+  good: 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+  warn: 'bg-amber-500/10 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+  bad: 'bg-red-500/10 text-red-700 dark:bg-red-500/15 dark:text-red-300',
 }
 
 export function Status({ code, label, count }: { code: string; label?: string; count?: number }) {
