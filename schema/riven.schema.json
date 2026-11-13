@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/faysal/riven/schema/riven.schema.json",
+  "title": "Riven manifest",
+  "description": "Contract between the Riven PHP collector and the Riven engine. Additive changes are minor; renames or removals bump schema_version. Unknown values are null, never guessed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "generator", "generated_at", "app", "routes", "warnings"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "const": "faysal/riven" },
+        "version": { "type": ["string", "null"] }
+      }
+    },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "app": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "url", "laravel_version", "php_version"],
+      "properties": {
+        "name": { "type": ["string", "null"] },
+        "url": { "type": ["string", "null"] },
+        "laravel_version": { "type": "string" },
+        "php_version": { "type": "string" }
+      }
+    },
+    "routes": { "type": "array", "items": { "$ref": "#/$defs/route" } },
+    "warnings": { "type": "array", "items": { "$ref": "#/$defs/warning" } }
+  },
+  "$defs": {
+    "className": { "type": "string", "minLength": 1 },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "uri", "methods", "name", "domain", "action", "middleware", "middleware_resolved", "parameters", "request", "response"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Z]+ /" },
+        "uri": { "type": "string" },
+        "methods": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": { "enum": ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] }
+        },
+        "name": { "type": ["string", "null"] },
+        "domain": { "type": ["string", "null"] },
+        "action": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "class", "method"],
+          "properties": {
+            "type": { "enum": ["controller", "invokable", "closure"] },
+            "class": { "oneOf": [{ "$ref": "#/$defs/className" }, { "type": "null" }] },
+            "method": { "type": ["string", "null"] }
+          }
+        },
+        "middleware": { "type": "array", "items": { "type": "string" } },
+        "middleware_resolved": { "type": "array", "items": { "type": "string" } },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "required", "pattern"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "required": { "type": "boolean" },
+              "pattern": { "type": ["string", "null"] }
+            }
+          }
+        },
+        "request": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["form_request", "rules"],
+          "properties": {
+            "form_request": { "oneOf": [{ "$ref": "#/$defs/className" }, { "type": "null" }] },
+            "rules": {
+              "description": "field => Laravel rule strings; null when there is no FormRequest or rules() needs a live request",
+              "oneOf": [
+                { "type": "null" },
+                { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } }
+              ]
+            }
+          }
+        },
+        "response": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["resource", "collection"],
+          "properties": {
+            "resource": { "oneOf": [{ "$ref": "#/$defs/className" }, { "type": "null" }] },
+            "collection": { "type": ["boolean", "null"] }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "action": { "properties": { "type": { "const": "closure" } } } } },
+          "then": { "properties": { "action": { "properties": { "class": { "type": "null" }, "method": { "type": "null" } } } } },
+          "else": { "properties": { "action": { "properties": { "class": { "type": "string" }, "method": { "type": "string" } } } } }
+        },
+        {
+          "if": { "properties": { "response": { "properties": { "resource": { "type": "null" } } } } },
+          "then": { "properties": { "response": { "properties": { "collection": { "type": "null" } } } } },
+          "else": { "properties": { "response": { "properties": { "collection": { "type": "boolean" } } } } }
+        }
+      ]
+    },
+    "warning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["route_id", "code", "message"],
+      "properties": {
+        "route_id": { "type": "string" },
+        "code": { "enum": ["controller_middleware_unresolved", "rules_need_request"] },
+        "message": { "type": "string" }
+      }
+    }
+  }
+}

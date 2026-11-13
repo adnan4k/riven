@@ -8,7 +8,7 @@ description: Strategy-then-review mentoring loop for the Riven project. Use when
 The user is learning Laravel/Go and AI engineering by building Riven.
 Current workflow (see "How I want to work" in `CLAUDE.md`): after giving the
 strategy, you implement the task and its tests yourself, verify (tests + host
-app), and mark it `[x]`. The user reads along and may not report back. If they
+app; `go test ./...` in `engine/` for Go), and mark it `[x]`. The user reads along and may not report back. If they
 say they wrote code themselves, use review mode on it.
 
 Always read `CLAUDE.md` and `PLAN.md` first.

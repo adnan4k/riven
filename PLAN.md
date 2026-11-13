@@ -31,13 +31,14 @@ Work top to bottom; don't start a milestone until the previous one's gate passes
   - Done when: fixture returns are detected; unknown → `null`, not a guess
 - [x] Config file `config/riven.php` (publishable): include/exclude patterns, output path
   - Done when: `vendor:publish --tag=riven-config` works and options are honored
-- [ ] `riven:export` writes `riven.json` matching the Manifest contract below
+- [x] `riven:export` writes `riven.json` matching the Manifest contract below
   - Done when: output validates against `schema/riven.schema.json` in a test
 
-**Gate:** `riven:export` on `riven-app` produces a valid manifest; schema frozen as v1.
+**Gate:** `riven:export` on `riven-app` produces a valid manifest; schema frozen as v1. ✅ passed 2026-11-13
 
-## M2 — Go engine skeleton (`riven-engine` repo)
-- [ ] Repo, Go module, CLI framework choice (cobra vs stdlib `flag`), decide with reasons
+## M2 — Go engine skeleton (`engine/` in this repo)
+- [x] Go module in `engine/`, CLI framework choice (cobra vs stdlib `flag`), decide with reasons
+  - Done when: `go test ./...` passes and `go run ./cmd/riven-engine --version` works
 - [ ] Manifest structs + loader with `schema_version` check
   - Done when: loads the M1 output; rejects an unknown major version with a clear error
 - [ ] `riven-engine routes` prints routes
@@ -71,7 +72,10 @@ Work top to bottom; don't start a milestone until the previous one's gate passes
 
 ---
 
-## Manifest contract (draft, schema_version 1)
+## Manifest contract (schema_version 1, frozen)
+
+**Source of truth: `schema/riven.schema.json`** (JSON Schema 2020-12, strict: unknown fields
+are rejected, so any new field must be added there first). The example below is illustrative.
 
 Rules: additive changes = minor; renames/removals = bump `schema_version`.
 Unknown values are `null`, never guessed. Non-fatal problems go in `warnings`.
@@ -79,13 +83,13 @@ Unknown values are `null`, never guessed. Non-fatal problems go in `warnings`.
 ```json
 {
   "schema_version": 1,
-  "generator": { "name": "faysal/riven", "version": "0.1.0" },
+  "generator": { "name": "faysal/riven", "version": "0.1.0" },  // version null if unknown
   "generated_at": "2026-11-13T12:00:00Z",
   "app": {
     "name": "riven-app",
     "url": "http://localhost:8000",
-    "laravel_version": "13.x",
-    "php_version": "8.4.x"
+    "laravel_version": "13.42.0",
+    "php_version": "8.4.24"
   },
   "routes": [
     {
@@ -126,14 +130,18 @@ Field notes:
 - `request.rules`: `field => [rule strings]`, `null` when there's no FormRequest or `rules()` needs a
   live request (then a `rules_need_request` warning). Strings are Laravel's own syntax (`max:255`,
   `in:"a","b"`); rule objects without a string form appear as their class name, closures as `Closure`.
-  Wildcard keys (`items.*.id`) are kept as-is.
+  Wildcard keys (`items.*.id`) are kept as-is. A FormRequest with no rules gives `{}`.
 - `response`: `{resource, collection}`, both `null` when unknown (no guessing). From the declared
   return type, else from every `return` in the action body (`new X`, `X::make`, `X::collection`,
   through chained calls); all returns must agree. Named collections report the item resource
   (`$collects`, else Laravel's `UserCollection` → `UserResource` naming rule).
 
-Open questions (decide before freezing v1):
-- Include Resource field shapes now, or leave for a later schema version?
+- `warnings[].code`: `controller_middleware_unresolved` | `rules_need_request` (new codes are additive).
+
+Deferred (additive, no version bump needed):
+- Resource field shapes (`toArray()` keys/types): static keys + AI types in M4.
+- Source locations (`action.file`/`start_line`/`end_line`, `response.resource_file`) and a
+  top-level `resources[]` candidate list, for the M4 AI fallback.
 
 ---
 
@@ -152,3 +160,6 @@ Open questions (decide before freezing v1):
 | 2026-11-13 | Resource detection uses `nikic/php-parser` (^5, new runtime dep) on the action's own `return`s; ambiguity → `null` | Already installed in every Laravel app (via Tinker/psysh); an AST with `use` resolution is reliable where token matching isn't; limited patterns keep it far from a full inference engine (Scramble) |
 | 2026-11-13 | Config: `include` / `exclude` URI patterns (exclude wins), `exclude_vendor` toggle, relative `output` path; read only in the provider's scanner binding | The scanner stays config-free and testable with plain arguments; one place maps config → constructor (named args) |
 | 2026-11-13 | AI fallback (M4, Go engine): providers `none` (default) / `ollama` / `anthropic`; choose-from-candidates schema; cached by source hash | Keeps Riven deterministic by default, free+private option via local models, constrained output prevents invented class names |
+| 2026-11-13 | Manifest v1 frozen; `schema/riven.schema.json` is the source of truth, strict (`additionalProperties: false`); Resource shapes deferred | Strict schema makes contract drift fail tests instead of silently reaching the engine; deferred fields are additive |
+| 2026-11-13 | Monorepo: Go engine in `engine/` (module `github.com/faysal/riven/engine`), not a separate repo; `.gitattributes` export-ignores it | One place for both halves and the schema they share; a subdirectory because Go reads a root `vendor/` as Go vendoring, which Composer's `vendor/` breaks; Composer installs stay PHP-only (the binary is downloaded, M6) |
+| 2026-11-13 | Engine CLI uses Cobra; `internal/cli` only parses flags and prints, logic in its own packages | Several subcommands are planned (`routes`, `stress`, `docs`, `serve`) and Cobra gives per-command flags, help and completion; stdlib `flag` has no subcommands. Thin CLI layer keeps logic testable and the framework swappable |

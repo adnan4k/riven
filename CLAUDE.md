@@ -8,15 +8,19 @@ route analysis, and AI test generation.
 Use the `riven-mentor` skill (`/riven-mentor`) for the next-step / review loop.
 
 ## Architecture
-Two halves connected by a JSON manifest:
+Two halves in this one repo (monorepo), connected by a JSON manifest:
 
-- **PHP collector** (this repo, `faysal/riven`): runs inside the Laravel app.
+- **PHP collector** (repo root, `faysal/riven`, `src/`): runs inside the Laravel app.
   Does only what requires the app: scans routes, reflects controllers, reads
   FormRequest rules, Resource shapes, and middleware. Exports `riven.json`.
-- **Go engine** (`riven-engine`, not started): reads the manifest. Handles
+- **Go engine** (`engine/`, module `github.com/faysal/riven/engine`, binary
+  `riven-engine`): reads the manifest. Handles
   stress testing (goroutines), Claude API analysis, OpenAPI building, test
   generation, and a React dashboard embedded via `go:embed`. Shipped as
-  cross-platform binaries downloaded on `composer install`.
+  cross-platform binaries downloaded on `composer install`. Lives in `engine/`,
+  not the root, because Go treats a root `vendor/` as Go vendoring and
+  Composer's `vendor/` would break the build. `.gitattributes` keeps `engine/`
+  out of Composer dist installs.
 
 The manifest (`riven.json`) is the contract between the two halves. Its schema
 is drafted in `PLAN.md` (Manifest contract). Any change to it must bump
@@ -36,6 +40,9 @@ is drafted in `PLAN.md` (Manifest contract). Any change to it must bump
 - Collectors/scanners live in `src/Scanner/`, return plain arrays (manifest-shaped), no output
 - Commands only format/print; logic stays in scanners (so it's testable)
 - Tests: Pest + Orchestra Testbench in `tests/`
+- Go: `cmd/riven-engine` (main only), `internal/cli` (Cobra commands: flags +
+  output only), logic in its own packages (e.g. `manifest/`); stdlib `testing`,
+  run `go test ./...` from `engine/`
 
 ## How I want to work
 - I'm learning: I've used Laravel before, but mostly with AI-written code

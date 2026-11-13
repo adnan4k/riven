@@ -2,3 +2,5 @@ vendor/
 composer.lock
 .phpunit.cache/
 .qodo/
+/engine/bin/
+/engine/riven-engine

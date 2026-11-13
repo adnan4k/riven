@@ -4,6 +4,7 @@ namespace Riven;
 
 use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Support\ServiceProvider;
+use Riven\Commands\ExportManifestCommand;
 use Riven\Commands\ScanRoutesCommand;
 use Riven\Scanner\ActionReflector;
 use Riven\Scanner\ResourceDetector;
@@ -46,6 +47,7 @@ class RivenServiceProvider extends ServiceProvider
 
             $this->commands([
                 ScanRoutesCommand::class,
+                ExportManifestCommand::class,
             ]);
         }
     }

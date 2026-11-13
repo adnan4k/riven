@@ -1,0 +1,10 @@
+# Keep Composer installs (Packagist dist zips) PHP-only: the Go engine ships as
+# prebuilt binaries (M6), so its source, tests and dev files stay out.
+/engine          export-ignore
+/tests           export-ignore
+/.claude         export-ignore
+/.vscode         export-ignore
+/phpunit.xml     export-ignore
+/PLAN.md         export-ignore
+/CLAUDE.md       export-ignore
+/.gitattributes  export-ignore
