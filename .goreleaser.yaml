@@ -1,0 +1,48 @@
+# Release builds of riven-engine (the Go half), run by .github/workflows/release.yml
+# on a v* tag. One tag versions both halves: Composer installs faysal/riven vX.Y.Z
+# and its installer downloads riven-engine X.Y.Z from the same GitHub release.
+version: 2
+project_name: riven-engine
+
+before:
+  hooks:
+    # The dashboard is embedded with go:embed, so build it first.
+    - npm --prefix engine/web ci
+    - npm --prefix engine/web run build
+
+builds:
+  - id: riven-engine
+    dir: engine
+    main: ./cmd/riven-engine
+    binary: riven-engine
+    env:
+      - CGO_ENABLED=0 # static binaries: no libc dependency, run on any distro
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X github.com/faysal/riven/engine/internal/cli.Version={{ .Version }}
+
+archives:
+  - id: riven-engine
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    # riven-engine_0.1.0_linux_amd64.tar.gz: the Composer installer builds this name.
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files: [LICENSE*, README*]
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude: ["^docs:", "^test:", "^chore:"]
+
+release:
+  # Review the generated notes and assets before publishing.
+  draft: true

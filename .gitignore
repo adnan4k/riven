@@ -8,3 +8,4 @@ composer.lock
 /engine/web/dist/*
 !/engine/web/dist/.gitkeep
 /riven-reports/
+/dist/
