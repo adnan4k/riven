@@ -19,7 +19,7 @@ import (
 const DefaultReportsDir = "riven-reports"
 
 func newServeCommand() *cobra.Command {
-	var addr, reports string
+	var addr, reports, baseURL, appDir string
 
 	cmd := &cobra.Command{
 		Use:   "serve",
@@ -36,8 +36,18 @@ re-running riven:export or a stress test shows up after a reload.`,
 				return fmt.Errorf("listen on %s: %w", addr, err)
 			}
 
+			if appDir == "" {
+				appDir, _ = os.Getwd()
+			}
+			host, _, _ := net.SplitHostPort(ln.Addr().String())
+			ip := net.ParseIP(host)
 			srv := &http.Server{
-				Handler:           server.New(server.Config{ManifestPath: path, ReportsDir: reports, UI: web.Dist()}),
+				Handler: server.New(server.Config{
+					ManifestPath: path, ReportsDir: reports, UI: web.Dist(),
+					BaseURL: baseURL, AppDir: appDir, Version: Version,
+					// Listening on a LAN address means other hosts are expected.
+					AllowAnyHost: ip == nil || !ip.IsLoopback(),
+				}),
 				ReadHeaderTimeout: 10 * time.Second,
 			}
 
@@ -60,5 +70,7 @@ re-running riven:export or a stress test shows up after a reload.`,
 
 	cmd.Flags().StringVar(&addr, "addr", "127.0.0.1:7600", "address to listen on (use 0.0.0.0:7600 to share on your network)")
 	cmd.Flags().StringVar(&reports, "reports", DefaultReportsDir, "directory with stress reports (from stress --save)")
+	cmd.Flags().StringVar(&baseURL, "base-url", "", "app URL for Try it and stress runs (default: app.url from the manifest)")
+	cmd.Flags().StringVar(&appDir, "app-dir", "", "Laravel app root for Rescan routes (default: current directory)")
 	return cmd
 }

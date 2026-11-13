@@ -80,5 +80,14 @@
       },
       "error_rate": 1
     }
+  ],
+  "timeline": [
+    {
+      "second": 0,
+      "requests": 4,
+      "failed": 2,
+      "p50_ms": 30,
+      "p95_ms": 40
+    }
   ]
 }

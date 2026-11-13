@@ -12,7 +12,7 @@ export function Section({ title, description, action, flush, children }: {
   return (
     <Card className={flush ? 'pb-0' : undefined}>
       <CardHeader>
-        <CardTitle>{title}</CardTitle>
+        <CardTitle className="label-mono text-foreground">{title}</CardTitle>
         {description && <CardDescription>{description}</CardDescription>}
         {action && <CardAction>{action}</CardAction>}
       </CardHeader>

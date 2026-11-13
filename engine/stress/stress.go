@@ -31,6 +31,14 @@ type Config struct {
 	Requests    int           // total requests to send; 0 = no limit
 	Duration    time.Duration // stop starting new requests after this; 0 = no limit
 	Timeout     time.Duration // per-request timeout; 0 = 30s
+	// Recorder, if set, sees every kept result as it happens (from many
+	// goroutines at once, so it must be safe for concurrent use).
+	Recorder Recorder
+}
+
+// Recorder receives results while a run is in progress, e.g. for a live view.
+type Recorder interface {
+	Record(Result)
 }
 
 // Result is the outcome of one request.
@@ -118,6 +126,9 @@ func Run(ctx context.Context, client *http.Client, cfg Config, targets []Target)
 				r.Target = i
 				// Each worker appends to its own slice: no lock, no channel.
 				perWork[w] = append(perWork[w], r)
+				if cfg.Recorder != nil {
+					cfg.Recorder.Record(r)
+				}
 			}
 		}()
 	}

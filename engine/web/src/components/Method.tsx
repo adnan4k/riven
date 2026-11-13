@@ -1,35 +1,52 @@
 import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 
-// HTTP methods as badges, using theme variants only: writes stand out,
-// DELETE is destructive.
-const variant = {
-  GET: 'secondary',
-  POST: 'default',
-  PUT: 'outline',
-  PATCH: 'outline',
-  DELETE: 'destructive',
-} as const
+// Method colors are placeholders until the color pass.
+const methodColor: Record<string, string> = {
+  GET: 'text-sky-600',
+  POST: 'text-amber-600',
+  PUT: 'text-violet-600',
+  PATCH: 'text-violet-600',
+  DELETE: 'text-red-600',
+}
 
-export function Method({ method }: { method: string }) {
-  const v = variant[method as keyof typeof variant] ?? 'outline'
-  return <Badge variant={v} className="font-mono text-[11px] tracking-wide">{method}</Badge>
+// MethodText is the plain colored label used in lists ("GET   /api/orders").
+export function MethodText({ method, className }: { method: string; className?: string }) {
+  return <span className={cn('font-mono text-xs font-medium', methodColor[method] ?? 'text-muted-foreground', className)}>{method}</span>
+}
+
+// MethodTag is the boxed version for page headers.
+export function MethodTag({ method }: { method: string }) {
+  return (
+    <span className={cn('rounded-sm bg-muted px-2.5 py-1 font-mono text-sm font-medium', methodColor[method])}>{method}</span>
+  )
 }
 
 export function Methods({ methods }: { methods: string[] }) {
   return (
-    <span className="inline-flex flex-wrap gap-1">
-      {methods.filter((m) => m !== 'HEAD').map((m) => <Method key={m} method={m} />)}
+    <span className="inline-flex flex-wrap gap-2">
+      {methods.filter((m) => m !== 'HEAD').map((m) => <MethodText key={m} method={m} />)}
     </span>
   )
 }
 
-// Status codes keep their meaning: 5xx and transport errors are destructive.
-export function Status({ code, count }: { code: string; count?: number }) {
-  const bad = code === 'error' || code.startsWith('5') || !/^\d/.test(code)
-  const v = bad ? 'destructive' : code.startsWith('4') ? 'outline' : 'secondary'
+// Status codes keep their meaning: 2xx ok, 4xx client error, 5xx/transport errors bad.
+export function statusTone(code: string) {
+  if (!/^\d/.test(code) || code.startsWith('5')) return 'bad'
+  if (code.startsWith('4')) return 'warn'
+  return 'good'
+}
+
+const toneClass = {
+  good: 'bg-emerald-500/10 text-emerald-700',
+  warn: 'bg-amber-500/10 text-amber-700',
+  bad: 'bg-red-500/10 text-red-700',
+}
+
+export function Status({ code, label, count }: { code: string; label?: string; count?: number }) {
   return (
-    <Badge variant={v} className="font-mono">
-      {code}{count !== undefined && <span className="opacity-70">×{count}</span>}
+    <Badge variant="outline" className={cn('h-6 border-transparent font-mono', toneClass[statusTone(code)])}>
+      {code}{label && ` ${label}`}{count !== undefined && <span className="opacity-70">×{count}</span>}
     </Badge>
   )
 }

@@ -5,11 +5,13 @@ export interface Manifest {
   schema_version: number
   generated_at: string
   app: { name: string | null; url: string | null; laravel_version: string; php_version: string }
-  routes: Route[]
+  routes: ManifestRoute[]
   warnings: Warning[]
 }
 
-export interface Route {
+export type Route = ManifestRoute
+
+export interface ManifestRoute {
   id: string
   uri: string
   methods: string[]
@@ -67,6 +69,15 @@ export interface StressReport {
   config: ReportConfig
   summary: Stats
   routes: RouteStats[]
+  timeline: TimelinePoint[]
+}
+
+export interface TimelinePoint {
+  second: number
+  requests: number
+  failed: number
+  p50_ms: number
+  p95_ms: number
 }
 
 export interface ReportSummary {
@@ -108,4 +119,29 @@ export interface Operation {
 
 export interface OpenAPIDoc {
   paths: Record<string, Record<string, Operation>>
+}
+
+export interface AppConfig {
+  base_url: string
+  can_rescan: boolean
+}
+
+export interface TryResponse {
+  status: number
+  duration_ms: number
+  size_bytes: number
+  headers: Record<string, string>
+  body: string
+  truncated: boolean
+}
+
+export interface StressState {
+  state: 'idle' | 'running' | 'done' | 'failed'
+  id?: string
+  elapsed_ms: number
+  duration_ms: number
+  interrupted: boolean
+  report?: string
+  error?: string
+  live?: StressReport
 }

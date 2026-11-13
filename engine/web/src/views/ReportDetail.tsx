@@ -86,7 +86,7 @@ export function ReportDetail({ name }: { name: string }) {
 function Fact({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="min-w-0">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dt className="label-mono">{label}</dt>
       <dd className={mono ? 'font-mono break-all' : undefined}>{value}</dd>
     </div>
   )

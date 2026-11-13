@@ -70,12 +70,16 @@ Work top to bottom; don't start a milestone until the previous one's gate passes
 - [ ] (deferred with the AI pass) Eval set: a few fixture routes with expected descriptions, scored, to compare prompts/models
 
 ## M5 — Dashboard
-- [~] React app (Vite) built into `go:embed`, served by `riven-engine serve`
-- [ ] Views: routes list, route detail (docs), stress reports
+- [x] React app (Vite) built into `go:embed`, served by `riven-engine serve` (`engine/server`, `engine/web`)
+  - Done when: API tests (incl. path traversal) pass; built UI is served from the binary for riven-app
+- [x] Views: routes list, route detail (docs), stress reports (shadcn/ui)
+
+**Gate:** `riven-engine serve` in riven-app shows routes, docs and saved stress reports. ✅ passed 2026-11-13
 
 ## M6 — Ship
-- [ ] AI test generator (Pest tests from manifest + docs), with an eval like M4
-- [ ] Cross-platform binaries (goreleaser), checksums
+- [ ] (deferred with the AI work) AI test generator (Pest tests from manifest + docs), with an eval like M4
+- [x] Cross-platform binaries (goreleaser), checksums (`.goreleaser.yaml`, `.github/workflows/release.yml`, CI in `ci.yml`)
+  - Done when: all 6 targets cross-compile static with the version stamped, archives match the installer's naming, `checksums.txt` verifies, release binary serves the embedded UI (checked locally by hand; goreleaser itself first runs in CI)
 - [ ] Composer post-install downloads the matching binary (verify checksum)
 - [ ] README, LICENSE, tag v0.1.0, publish to Packagist
 
@@ -183,3 +187,5 @@ Deferred (additive, no version bump needed):
 | 2026-11-13 | OpenAPI built from generic maps (no typed model); optional params expand into separate paths; domain routes become path-level `servers` with variables; GET/DELETE rules become query params; POST+Resource answers 201; 401/422 documented from middleware/FormRequest; Resource schemas are open objects until shapes are analyzed | Maps serialise x- extensions exactly with no big dependency; OpenAPI path params must be required; each choice mirrors what Laravel does at runtime |
 | 2026-11-13 | OpenAPI validation in `go test` with `santhosh-tekuri/jsonschema/v6` (test-only, not linked into the binary) against the committed official OAS 3.1 schema | Offline and deterministic; the OAS schema skips Schema Objects, so each one is also compiled as 2020-12; a mutation check confirmed it rejects bad documents |
 | 2026-11-13 | Dashboard: `riven-engine serve` (127.0.0.1 by default) with a JSON API that re-reads files per request; reports opened via `os.Root`; React app in `engine/web`, built into `web/dist` (not committed) and embedded with `go:embed`; UI uses shadcn/ui (radix, Tailwind v4, default neutral theme, light mode) with its Sidebar | Local tool showing app internals, so local-only by default; `os.Root` blocks path traversal; embedding keeps one binary; shadcn gives accessible, consistent components we own as source |
+| 2026-11-13 | Releases: GoReleaser on a `v*` tag builds linux/darwin/windows × amd64/arm64, `CGO_ENABLED=0`, version from the tag via ldflags, archives `riven-engine_<ver>_<os>_<arch>.tar.gz` (.zip on Windows), sha256 `checksums.txt`, draft release; one tag versions both halves | Static binaries run on any distro; a predictable name + checksum file is all the Composer installer needs; draft lets a human check assets before publishing; one version number means the installer can derive the binary version from the Composer package |
+| 2026-11-13 | Package identity is `faysal/riven` (Composer name, Go module `github.com/faysal/riven/engine`, schema `$id`, manifest `generator.name`); releases are downloaded from github.com/faysal/riven | Owner's choice; Composer name, Go module and release URL must agree, so the GitHub repo has to live at faysal/riven (the current git remote is adnan4k/riven) |

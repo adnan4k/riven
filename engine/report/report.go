@@ -29,6 +29,16 @@ type Stress struct {
 	Config        Config       `json:"config"`
 	Summary       Stats        `json:"summary"`
 	Routes        []RouteStats `json:"routes"`
+	// Timeline has one point per second of the run (added in v1, additive).
+	Timeline []TimelinePoint `json:"timeline"`
+}
+
+type TimelinePoint struct {
+	Second   int     `json:"second"`
+	Requests int     `json:"requests"`
+	Failed   int     `json:"failed"`
+	P50Ms    float64 `json:"p50_ms"` // 0 when no request got a response that second
+	P95Ms    float64 `json:"p95_ms"`
 }
 
 type Generator struct {
@@ -89,6 +99,7 @@ type Run struct {
 	FinishedAt    time.Time
 	Interrupted   bool
 	Summary       stress.Summary
+	Timeline      []stress.Point
 }
 
 func NewStress(r Run) Stress {
@@ -111,8 +122,14 @@ func NewStress(r Run) Stress {
 			DurationMs:  millis(r.Config.Duration),
 			TimeoutMs:   millis(r.Config.Timeout),
 		},
-		Summary: stats(r.Summary.Total),
-		Routes:  []RouteStats{}, // [] rather than null when empty
+		Summary:  stats(r.Summary.Total),
+		Routes:   []RouteStats{}, // [] rather than null when empty
+		Timeline: []TimelinePoint{},
+	}
+	for _, p := range r.Timeline {
+		rep.Timeline = append(rep.Timeline, TimelinePoint{
+			Second: p.Second, Requests: p.Requests, Failed: p.Failed, P50Ms: millis(p.P50), P95Ms: millis(p.P95),
+		})
 	}
 	for _, t := range r.Summary.Targets {
 		rep.Routes = append(rep.Routes, RouteStats{RouteID: t.Name, Method: t.Method, URL: t.URL, Stats: stats(t.Stats)})

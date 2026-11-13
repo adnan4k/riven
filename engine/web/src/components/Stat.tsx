@@ -5,8 +5,8 @@ export function Stat({ label, value, tone }: { label: string; value: string | nu
   return (
     <Card size="sm" className={cn(tone === 'bad' && 'ring-destructive/40', tone === 'warn' && 'ring-amber-500/40')}>
       <CardHeader>
-        <CardDescription>{label}</CardDescription>
-        <CardTitle className={cn('text-2xl tabular-nums', tone === 'bad' && 'text-destructive')}>{value}</CardTitle>
+        <CardDescription className="label-mono">{label}</CardDescription>
+        <CardTitle className={cn('font-mono text-2xl font-medium tabular-nums', tone === 'bad' && 'text-destructive')}>{value}</CardTitle>
       </CardHeader>
     </Card>
   )

@@ -4,6 +4,10 @@
 //	GET /api/openapi         the OpenAPI document built from it
 //	GET /api/reports         stress report summaries, newest first
 //	GET /api/reports/{name}  one stress report file
+//	GET /api/config          base URL, whether rescan is available
+//	POST /api/try            send one request to the app (Try it)
+//	GET|POST /api/stress     live state of / start a stress run; POST /api/stress/stop
+//	POST /api/rescan         run php artisan riven:export
 //
 // Every other path serves the embedded dashboard (index.html for unknown
 // paths, so client-side routes work on reload).
@@ -27,7 +31,11 @@ import (
 type Config struct {
 	ManifestPath string
 	ReportsDir   string
-	UI           fs.FS // built dashboard; without index.html a build hint is shown
+	UI           fs.FS  // built dashboard; without index.html a build hint is shown
+	BaseURL      string // app URL for Try it and stress runs; default: the manifest's app.url
+	AppDir       string // Laravel app root, for Rescan (php artisan riven:export); "" disables it
+	Version      string // engine version, written into saved reports
+	AllowAnyHost bool   // serving on a LAN address on purpose: skip the localhost Host check
 }
 
 // New returns the handler. It holds no state: files are read per request,
@@ -35,6 +43,12 @@ type Config struct {
 func New(cfg Config) http.Handler {
 	s := &srv{cfg: cfg}
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/config", s.config)
+	mux.HandleFunc("POST /api/try", s.guard(s.try))
+	mux.HandleFunc("GET /api/stress", s.stressState)
+	mux.HandleFunc("POST /api/stress", s.guard(s.startStress))
+	mux.HandleFunc("POST /api/stress/stop", s.guard(s.stopStress))
+	mux.HandleFunc("POST /api/rescan", s.guard(s.rescan))
 	mux.HandleFunc("GET /api/manifest", s.manifest)
 	mux.HandleFunc("GET /api/openapi", s.openapi)
 	mux.HandleFunc("GET /api/reports", s.reports)
@@ -46,7 +60,10 @@ func New(cfg Config) http.Handler {
 	return mux
 }
 
-type srv struct{ cfg Config }
+type srv struct {
+	cfg  Config
+	runs runner
+}
 
 func (s *srv) loadManifest(w http.ResponseWriter) (*manifest.Manifest, bool) {
 	m, err := manifest.Load(s.cfg.ManifestPath)

@@ -146,6 +146,7 @@ func runStress(cmd *cobra.Command, f stressFlags) error {
 			FinishedAt:    finished,
 			Interrupted:   interrupted,
 			Summary:       summary,
+			Timeline:      stress.Timeline(results, started),
 		})
 		if err := report.Write(output, rep); err != nil {
 			return err

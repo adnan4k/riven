@@ -141,7 +141,7 @@ export function RouteDetail({ manifest, id, openapi, latestReport }: {
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dt className="label-mono">{label}</dt>
       <dd className="font-mono break-all">{value}</dd>
     </div>
   )

@@ -41,6 +41,7 @@ func fixedRun() Run {
 		StartedAt:     t0,
 		FinishedAt:    t0.Add(ms(100)),
 		Summary:       stress.Summarize(targets, results),
+		Timeline:      stress.Timeline(results, t0),
 	}
 }
 

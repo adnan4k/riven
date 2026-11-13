@@ -34,5 +34,5 @@ export function Link({ to, onClick, ...props }: ComponentProps<'a'> & { to: stri
   return <a href={to} onClick={handle} {...props} />
 }
 
-export const routePath = (id: string) => '/routes/' + encodeURIComponent(id)
+export const routePath = (id: string, tab?: string) => '/routes/' + encodeURIComponent(id) + (tab ? '/' + tab : '')
 export const reportPath = (name: string) => '/reports/' + encodeURIComponent(name)
