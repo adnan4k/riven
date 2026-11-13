@@ -26,7 +26,7 @@ func route(rules string) string {
 }
 
 func TestLoadsRealExport(t *testing.T) {
-	m, err := Load("testdata/riven-app.json")
+	m, err := Load("../testdata/riven-app.json")
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}

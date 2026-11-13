@@ -43,7 +43,10 @@ Work top to bottom; don't start a milestone until the previous one's gate passes
   - Done when: loads the M1 output; rejects an unknown major version with a clear error
 - [x] `riven-engine routes` prints routes
   - Done when: output matches `riven:scan` for the same app (cells identical on riven-app; artisan collapses cell padding, see log)
-- [ ] Golden-file test using a committed sample manifest
+- [x] Golden-file test using a committed sample manifest
+  - Done when: `routes` output on `engine/testdata/riven-app.json` matches `internal/cli/testdata/*.golden`; `-update` regenerates
+
+**Gate:** engine loads the M1 manifest and lists routes; tests green in both halves. ✅ passed 2026-11-13
 
 ## M3 — Stress tester
 - [ ] Worker pool (goroutines), configurable concurrency, duration / request count
@@ -165,3 +168,4 @@ Deferred (additive, no version bump needed):
 | 2026-11-13 | Engine CLI uses Cobra; `internal/cli` only parses flags and prints, logic in its own packages | Several subcommands are planned (`routes`, `stress`, `docs`, `serve`) and Cobra gives per-command flags, help and completion; stdlib `flag` has no subcommands. Thin CLI layer keeps logic testable and the framework swappable |
 | 2026-11-13 | Go manifest types: JSON null → nil (pointers for scalars, nil map for `rules`); `schema_version` checked before full decode; unknown fields ignored | nil keeps "unknown" distinct from zero values (`{}` rules decode to an empty map, `null` to nil); version-first gives a clear error instead of a type error on an incompatible file; additive fields don't bump the version, so the engine must tolerate them (strictness stays in the PHP schema test) |
 | 2026-11-13 | `riven-engine routes` renders Symfony's default table style itself (`internal/table`, no dependency); warnings go to stderr | Same look as artisan with ~60 lines instead of a table library; stderr keeps `routes > file` clean. Open oddity: `riven:scan` in riven-app prints correct borders but unpadded cells, while plain Symfony `Table` pads in the same app; cell content is identical, cause not found yet |
+| 2026-11-13 | One shared sample manifest (`engine/testdata/riven-app.json`, a real export), validated against the schema by a Pest test; golden files for CLI output with a `-update` flag | Both halves test against the same file, so schema drift fails on the PHP side before Go tests silently pass on stale data; golden files make any output change show up as a reviewable diff |

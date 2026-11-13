@@ -1,0 +1,239 @@
+{
+    "schema_version": 1,
+    "generator": {
+        "name": "faysal/riven",
+        "version": "dev-main"
+    },
+    "generated_at": "2026-11-13T15:08:48Z",
+    "app": {
+        "name": "Laravel",
+        "url": "http://localhost:8000",
+        "laravel_version": "13.42.0",
+        "php_version": "8.4.24"
+    },
+    "routes": [
+        {
+            "id": "GET /api/users",
+            "uri": "api/users",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "users.index",
+            "domain": null,
+            "action": {
+                "type": "controller",
+                "class": "App\\Http\\Controllers\\Api\\UserController",
+                "method": "index"
+            },
+            "middleware": [
+                "api"
+            ],
+            "middleware_resolved": [
+                "Illuminate\\Routing\\Middleware\\SubstituteBindings"
+            ],
+            "parameters": [],
+            "request": {
+                "form_request": null,
+                "rules": null
+            },
+            "response": {
+                "resource": "App\\Http\\Resources\\UserResource",
+                "collection": true
+            }
+        },
+        {
+            "id": "POST /api/users",
+            "uri": "api/users",
+            "methods": [
+                "POST"
+            ],
+            "name": "users.store",
+            "domain": null,
+            "action": {
+                "type": "controller",
+                "class": "App\\Http\\Controllers\\Api\\UserController",
+                "method": "store"
+            },
+            "middleware": [
+                "api"
+            ],
+            "middleware_resolved": [
+                "Illuminate\\Routing\\Middleware\\SubstituteBindings"
+            ],
+            "parameters": [],
+            "request": {
+                "form_request": "App\\Http\\Requests\\StoreUserRequest",
+                "rules": {
+                    "name": [
+                        "required",
+                        "string",
+                        "max:255"
+                    ],
+                    "email": [
+                        "required",
+                        "email",
+                        "unique:users,email"
+                    ],
+                    "password": [
+                        "required",
+                        "Illuminate\\Validation\\Rules\\Password"
+                    ]
+                }
+            },
+            "response": {
+                "resource": "App\\Http\\Resources\\UserResource",
+                "collection": false
+            }
+        },
+        {
+            "id": "GET /api/users/{user}",
+            "uri": "api/users/{user}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "users.show",
+            "domain": null,
+            "action": {
+                "type": "controller",
+                "class": "App\\Http\\Controllers\\Api\\UserController",
+                "method": "show"
+            },
+            "middleware": [
+                "api"
+            ],
+            "middleware_resolved": [
+                "Illuminate\\Routing\\Middleware\\SubstituteBindings"
+            ],
+            "parameters": [
+                {
+                    "name": "user",
+                    "required": true,
+                    "pattern": null
+                }
+            ],
+            "request": {
+                "form_request": null,
+                "rules": null
+            },
+            "response": {
+                "resource": "App\\Http\\Resources\\UserResource",
+                "collection": false
+            }
+        },
+        {
+            "id": "PUT /api/users/{user}",
+            "uri": "api/users/{user}",
+            "methods": [
+                "PUT",
+                "PATCH"
+            ],
+            "name": "users.update",
+            "domain": null,
+            "action": {
+                "type": "controller",
+                "class": "App\\Http\\Controllers\\Api\\UserController",
+                "method": "update"
+            },
+            "middleware": [
+                "api"
+            ],
+            "middleware_resolved": [
+                "Illuminate\\Routing\\Middleware\\SubstituteBindings"
+            ],
+            "parameters": [
+                {
+                    "name": "user",
+                    "required": true,
+                    "pattern": null
+                }
+            ],
+            "request": {
+                "form_request": "App\\Http\\Requests\\UpdateUserRequest",
+                "rules": null
+            },
+            "response": {
+                "resource": "App\\Http\\Resources\\UserResource",
+                "collection": false
+            }
+        },
+        {
+            "id": "DELETE /api/users/{user}",
+            "uri": "api/users/{user}",
+            "methods": [
+                "DELETE"
+            ],
+            "name": "users.destroy",
+            "domain": null,
+            "action": {
+                "type": "controller",
+                "class": "App\\Http\\Controllers\\Api\\UserController",
+                "method": "destroy"
+            },
+            "middleware": [
+                "api"
+            ],
+            "middleware_resolved": [
+                "Illuminate\\Routing\\Middleware\\SubstituteBindings"
+            ],
+            "parameters": [
+                {
+                    "name": "user",
+                    "required": true,
+                    "pattern": null
+                }
+            ],
+            "request": {
+                "form_request": null,
+                "rules": null
+            },
+            "response": {
+                "resource": null,
+                "collection": null
+            }
+        },
+        {
+            "id": "GET /",
+            "uri": "/",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "domain": null,
+            "action": {
+                "type": "closure",
+                "class": null,
+                "method": null
+            },
+            "middleware": [
+                "web"
+            ],
+            "middleware_resolved": [
+                "Illuminate\\Cookie\\Middleware\\EncryptCookies",
+                "Illuminate\\Cookie\\Middleware\\AddQueuedCookiesToResponse",
+                "Illuminate\\Session\\Middleware\\StartSession",
+                "Illuminate\\View\\Middleware\\ShareErrorsFromSession",
+                "Illuminate\\Foundation\\Http\\Middleware\\PreventRequestForgery",
+                "Illuminate\\Routing\\Middleware\\SubstituteBindings"
+            ],
+            "parameters": [],
+            "request": {
+                "form_request": null,
+                "rules": null
+            },
+            "response": {
+                "resource": null,
+                "collection": null
+            }
+        }
+    ],
+    "warnings": [
+        {
+            "route_id": "PUT /api/users/{user}",
+            "code": "rules_need_request",
+            "message": "Could not read App\\Http\\Requests\\UpdateUserRequest::rules() outside a request: Attempt to read property \"id\" on null"
+        }
+    ]
+}

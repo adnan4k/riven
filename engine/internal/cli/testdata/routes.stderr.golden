@@ -1,0 +1,1 @@
+PUT /api/users/{user}: Could not read App\Http\Requests\UpdateUserRequest::rules() outside a request: Attempt to read property "id" on null

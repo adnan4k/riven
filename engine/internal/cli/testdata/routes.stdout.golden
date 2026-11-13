@@ -1,0 +1,10 @@
++------------------+-----------+---------------+-------------------------------------------------+------------+
+| URI              | Methods   | Name          | Action                                          | Middleware |
++------------------+-----------+---------------+-------------------------------------------------+------------+
+| api/users        | GET|HEAD  | users.index   | App\Http\Controllers\Api\UserController@index   | api        |
+| api/users        | POST      | users.store   | App\Http\Controllers\Api\UserController@store   | api        |
+| api/users/{user} | GET|HEAD  | users.show    | App\Http\Controllers\Api\UserController@show    | api        |
+| api/users/{user} | PUT|PATCH | users.update  | App\Http\Controllers\Api\UserController@update  | api        |
+| api/users/{user} | DELETE    | users.destroy | App\Http\Controllers\Api\UserController@destroy | api        |
+| /                | GET|HEAD  |               | Closure                                         | web        |
++------------------+-----------+---------------+-------------------------------------------------+------------+
