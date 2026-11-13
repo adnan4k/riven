@@ -49,8 +49,11 @@ Work top to bottom; don't start a milestone until the previous one's gate passes
 **Gate:** engine loads the M1 manifest and lists routes; tests green in both halves. ✅ passed 2026-11-13
 
 ## M3 — Stress tester
-- [ ] Worker pool (goroutines), configurable concurrency, duration / request count
-- [ ] Per-route targeting from manifest, param substitution, auth header injection
+- [x] Worker pool (goroutines), configurable concurrency, duration / request count (`engine/stress`)
+  - Done when: `httptest` tests prove exact request counts, the concurrency cap, connection reuse, duration stop and cancel; race detector clean
+- [x] Per-route targeting from manifest, param substitution, auth header injection (`engine/targets`, `riven-engine stress`)
+  - Done when: `--dry-run` lists the right URLs for riven-app; params escaped and checked against `where()`; headers reach the server in an `httptest` run
+- [ ] Request bodies for routes with rules (generate from rules or `--body`), so POST/PUT don't just measure 422s
 - [ ] Metrics: p50/p95/p99 latency, RPS, error rate, status histogram
 - [ ] JSON report output (consumed later by the dashboard)
   - Done when: run against `riven-app` locally produces a report; a test uses `httptest.Server`
@@ -169,3 +172,5 @@ Deferred (additive, no version bump needed):
 | 2026-11-13 | Go manifest types: JSON null → nil (pointers for scalars, nil map for `rules`); `schema_version` checked before full decode; unknown fields ignored | nil keeps "unknown" distinct from zero values (`{}` rules decode to an empty map, `null` to nil); version-first gives a clear error instead of a type error on an incompatible file; additive fields don't bump the version, so the engine must tolerate them (strictness stays in the PHP schema test) |
 | 2026-11-13 | `riven-engine routes` renders Symfony's default table style itself (`internal/table`, no dependency); warnings go to stderr | Same look as artisan with ~60 lines instead of a table library; stderr keeps `routes > file` clean. Open oddity: `riven:scan` in riven-app prints correct borders but unpadded cells, while plain Symfony `Table` pads in the same app; cell content is identical, cause not found yet |
 | 2026-11-13 | One shared sample manifest (`engine/testdata/riven-app.json`, a real export), validated against the schema by a Pest test; golden files for CLI output with a `-update` flag | Both halves test against the same file, so schema drift fails on the PHP side before Go tests silently pass on stale data; golden files make any output change show up as a reviewable diff |
+| 2026-11-13 | Stress pool: N workers pull request numbers from an atomic counter (round-robin over targets), per-worker result slices merged at the end, every `Result` kept; client sized to `MaxIdleConnsPerHost = concurrency`, no redirects followed; duration stops issuing but lets in-flight requests finish, Ctrl-C drops cut-off requests | No locks/channels on the hot path; keeping raw results gives exact percentiles (memory is ~100 B/request, fine for runs up to millions; switch to a histogram if needed); Go's default 2 idle conns/host would measure TCP handshakes instead of the app |
+| 2026-11-13 | Stress targeting: GET routes only by default, others only via `--route` (id or name, `*` wildcard); missing required params skip the route with a reason; `where()` patterns checked as a full match (RE2, PCRE-only patterns skipped); `Accept: application/json` by default; warnings for likely 401 (resolved `Authenticate` middleware, no credentials) and 422 (FormRequest with rules or unknown rules, no body yet) | Load-testing writes data, so it must be opt-in; a skipped route with a reason beats sending a literal `{user}`; JSON Accept makes Laravel return 401/422 JSON instead of redirects or HTML, so statuses mean what they say |
