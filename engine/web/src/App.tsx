@@ -30,6 +30,7 @@ export function App() {
 
   const [query, setQuery] = useState('')
   const [rescan, setRescan] = useState<{ busy: boolean; error?: string }>({ busy: false })
+  const scan = useLiveUpdates(() => setVersion((v) => v + 1))
 
   const [, section, param, tab] = path.split('/')
   const selectedId = section === 'routes' && param ? decodeURIComponent(param) : null
@@ -40,8 +41,7 @@ export function App() {
     setRescan({ busy: true })
     try {
       await postJSON('/api/rescan', {})
-      setRescan({ busy: false })
-      setVersion((v) => v + 1)
+      setRescan({ busy: false }) // the "manifest" event triggers the reload
     } catch (e) {
       setRescan({ busy: false, error: (e as Error).message })
     }
@@ -53,7 +53,8 @@ export function App() {
         appName={manifest.state === 'ok' ? manifest.data.app.name : null}
         baseUrl={config.state === 'ok' ? config.data.base_url : ''}
         canRescan={config.state === 'ok' && config.data.can_rescan}
-        rescanning={rescan.busy}
+        rescanning={rescan.busy || scan.state === 'running'}
+        scanNote={scan.state === 'done' ? 'Routes updated' : undefined}
         onRescan={doRescan}
         query={query}
         onQuery={setQuery}
@@ -70,8 +71,11 @@ export function App() {
 
         <main className="min-w-0 flex-1 overflow-y-auto">
           <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-8">
-            {rescan.error && (
-              <Alert variant="destructive"><AlertTitle>Rescan failed</AlertTitle><AlertDescription>{rescan.error}</AlertDescription></Alert>
+            {(rescan.error || scan.state === 'failed') && (
+              <Alert variant="destructive">
+                <AlertTitle>Couldn't rescan the routes</AlertTitle>
+                <AlertDescription><pre className="font-mono text-xs whitespace-pre-wrap">{rescan.error ?? scan.message}</pre></AlertDescription>
+              </Alert>
             )}
             {manifest.state === 'loading' && <Skeleton className="h-64 w-full" />}
             {manifest.state === 'error' && (
@@ -104,11 +108,35 @@ export function App() {
   )
 }
 
-function TopBar({ appName, baseUrl, canRescan, rescanning, onRescan, query, onQuery }: {
+// useLiveUpdates listens to /api/events: the engine watches the app's code,
+// re-exports on change, and tells us to reload. EventSource reconnects by itself.
+function useLiveUpdates(onManifest: () => void) {
+  const [scan, setScan] = useState<{ state: 'idle' | 'running' | 'done' | 'failed'; message?: string }>({ state: 'idle' })
+  const reload = useRef(onManifest)
+  reload.current = onManifest
+
+  useEffect(() => {
+    const es = new EventSource('/api/events')
+    let clear: ReturnType<typeof setTimeout>
+    es.addEventListener('manifest', () => reload.current())
+    es.addEventListener('scan', (msg) => {
+      const e = JSON.parse((msg as MessageEvent).data) as { state: 'running' | 'done' | 'failed'; message?: string }
+      clearTimeout(clear)
+      setScan({ state: e.state, message: e.message })
+      if (e.state === 'done') clear = setTimeout(() => setScan({ state: 'idle' }), 2500)
+    })
+    return () => { clearTimeout(clear); es.close() }
+  }, [])
+
+  return scan
+}
+
+function TopBar({ appName, baseUrl, canRescan, rescanning, scanNote, onRescan, query, onQuery }: {
   appName: string | null
   baseUrl: string
   canRescan: boolean
   rescanning: boolean
+  scanNote?: string
   onRescan: () => void
   query: string
   onQuery: (q: string) => void
@@ -143,6 +171,7 @@ function TopBar({ appName, baseUrl, canRescan, rescanning, onRescan, query, onQu
       </div>
 
       <div className="ml-auto flex items-center gap-2">
+        {scanNote && <span className="hidden text-xs text-emerald-600 sm:inline dark:text-emerald-400" role="status">{scanNote}</span>}
         {baseUrl && (
           <span className="hidden items-center gap-2 text-sm lg:flex">
             <span className="text-muted-foreground">Target</span>
@@ -152,7 +181,7 @@ function TopBar({ appName, baseUrl, canRescan, rescanning, onRescan, query, onQu
         <Button variant="outline" size="sm" onClick={onRescan} disabled={!canRescan || rescanning}
           title={canRescan ? 'Run php artisan riven:export' : 'Run serve from your Laravel app to enable this'}>
           <RefreshCw className={cn(rescanning && 'animate-spin')} />
-          {rescanning ? 'Rescanning…' : 'Rescan routes'}
+          {rescanning ? 'Scanning…' : 'Rescan routes'}
         </Button>
       </div>
     </header>

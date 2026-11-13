@@ -388,29 +388,43 @@ func (s *srv) stopStress(w http.ResponseWriter, r *http.Request) {
 // POST /api/rescan runs `php artisan riven:export` in the app directory, so a
 // route change shows up without leaving the dashboard.
 func (s *srv) rescan(w http.ResponseWriter, r *http.Request) {
-	if s.cfg.AppDir == "" {
-		writeError(w, http.StatusNotFound, "rescan is off (no app directory)")
+	if !s.canExport() {
+		writeError(w, http.StatusNotFound, "rescan needs the Laravel app: run serve from the app directory (no artisan file in "+s.cfg.AppDir+")")
 		return
 	}
-	if _, err := os.Stat(filepath.Join(s.cfg.AppDir, "artisan")); err != nil {
-		writeError(w, http.StatusNotFound, "no artisan file in "+s.cfg.AppDir+": run serve from your Laravel app")
+	out, err := s.export(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	writeJSON(w, map[string]string{"output": out})
+}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+// export runs riven:export, one at a time (the Rescan button and the file
+// watcher share it), and tells dashboards how it went.
+func (s *srv) export(ctx context.Context) (string, error) {
+	s.exportMu.Lock()
+	defer s.exportMu.Unlock()
+	s.hub.publish(Event{Type: "scan", State: "running"})
+
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "php", "artisan", "riven:export", "--no-ansi", "--output="+s.cfg.ManifestPath)
 	cmd.Dir = s.cfg.AppDir
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
+
 	if err := cmd.Run(); err != nil {
-		var exit *exec.ExitError
 		msg := err.Error()
+		var exit *exec.ExitError
 		if errors.As(err, &exit) {
 			msg = strings.TrimSpace(out.String())
 		}
-		writeError(w, http.StatusInternalServerError, "riven:export failed: "+msg)
-		return
+		err = errors.New("riven:export failed: " + msg)
+		s.hub.publish(Event{Type: "scan", State: "failed", Message: err.Error()})
+		return "", err
 	}
-	writeJSON(w, map[string]string{"output": strings.TrimSpace(out.String())})
+	output := strings.TrimSpace(out.String())
+	s.hub.publish(Event{Type: "scan", State: "done", Message: output})
+	return output, nil
 }

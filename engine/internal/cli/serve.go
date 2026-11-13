@@ -20,6 +20,7 @@ const DefaultReportsDir = "riven-reports"
 
 func newServeCommand() *cobra.Command {
 	var addr, reports, baseURL, appDir string
+	var watchFiles bool
 
 	cmd := &cobra.Command{
 		Use:   "serve",
@@ -41,18 +42,22 @@ re-running riven:export or a stress test shows up after a reload.`,
 			}
 			host, _, _ := net.SplitHostPort(ln.Addr().String())
 			ip := net.ParseIP(host)
+			dash := server.New(server.Config{
+				ManifestPath: path, ReportsDir: reports, UI: web.Dist(),
+				BaseURL: baseURL, AppDir: appDir, Version: Version,
+				// Listening on a LAN address means other hosts are expected.
+				AllowAnyHost: ip == nil || !ip.IsLoopback(),
+				AutoExport:   watchFiles,
+			})
 			srv := &http.Server{
-				Handler: server.New(server.Config{
-					ManifestPath: path, ReportsDir: reports, UI: web.Dist(),
-					BaseURL: baseURL, AppDir: appDir, Version: Version,
-					// Listening on a LAN address means other hosts are expected.
-					AllowAnyHost: ip == nil || !ip.IsLoopback(),
-				}),
+				Handler:           dash,
 				ReadHeaderTimeout: 10 * time.Second,
 			}
 
 			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
 			defer stop()
+			dash.Watch(ctx)
+			srv.RegisterOnShutdown(dash.Close) // end open event streams so shutdown doesn't wait on them
 			go func() {
 				<-ctx.Done()
 				shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -72,5 +77,6 @@ re-running riven:export or a stress test shows up after a reload.`,
 	cmd.Flags().StringVar(&reports, "reports", DefaultReportsDir, "directory with stress reports (from stress --save)")
 	cmd.Flags().StringVar(&baseURL, "base-url", "", "app URL for Try it and stress runs (default: app.url from the manifest)")
 	cmd.Flags().StringVar(&appDir, "app-dir", "", "Laravel app root for Rescan routes (default: current directory)")
+	cmd.Flags().BoolVar(&watchFiles, "watch", true, "re-run riven:export when the app's PHP files change, and update open dashboards")
 	return cmd
 }

@@ -8,12 +8,14 @@
 //	POST /api/try            send one request to the app (Try it)
 //	GET|POST /api/stress     live state of / start a stress run; POST /api/stress/stop
 //	POST /api/rescan         run php artisan riven:export
+//	GET /api/events          Server-Sent Events: manifest changed, scan running/done/failed
 //
 // Every other path serves the embedded dashboard (index.html for unknown
 // paths, so client-side routes work on reload).
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -21,6 +23,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/faysal/riven/engine/manifest"
@@ -36,11 +39,24 @@ type Config struct {
 	AppDir       string // Laravel app root, for Rescan (php artisan riven:export); "" disables it
 	Version      string // engine version, written into saved reports
 	AllowAnyHost bool   // serving on a LAN address on purpose: skip the localhost Host check
+	AutoExport   bool   // Watch re-runs riven:export when the app's PHP files change
 }
 
-// New returns the handler. It holds no state: files are read per request,
-// so re-running riven:export or a stress test shows up without a restart.
-func New(cfg Config) http.Handler {
+// Server is the dashboard's HTTP handler. Files are read per request, so a
+// new export or stress report shows up on the next request; Watch also pushes
+// changes to open dashboards.
+type Server struct {
+	http.Handler
+	s *srv
+}
+
+// Watch syncs with the app until ctx is done (see srv.Watch).
+func (sv *Server) Watch(ctx context.Context) { sv.s.Watch(ctx) }
+
+// Close ends open event streams; call it when shutting down.
+func (sv *Server) Close() { sv.s.hub.close() }
+
+func New(cfg Config) *Server {
 	s := &srv{cfg: cfg}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/config", s.config)
@@ -49,6 +65,7 @@ func New(cfg Config) http.Handler {
 	mux.HandleFunc("POST /api/stress", s.guard(s.startStress))
 	mux.HandleFunc("POST /api/stress/stop", s.guard(s.stopStress))
 	mux.HandleFunc("POST /api/rescan", s.guard(s.rescan))
+	mux.HandleFunc("GET /api/events", s.events)
 	mux.HandleFunc("GET /api/manifest", s.manifest)
 	mux.HandleFunc("GET /api/openapi", s.openapi)
 	mux.HandleFunc("GET /api/reports", s.reports)
@@ -57,12 +74,14 @@ func New(cfg Config) http.Handler {
 		writeError(w, http.StatusNotFound, "no such API endpoint")
 	})
 	mux.HandleFunc("GET /", s.ui)
-	return mux
+	return &Server{Handler: mux, s: s}
 }
 
 type srv struct {
-	cfg  Config
-	runs runner
+	cfg      Config
+	runs     runner
+	hub      hub
+	exportMu sync.Mutex
 }
 
 func (s *srv) loadManifest(w http.ResponseWriter) (*manifest.Manifest, bool) {
