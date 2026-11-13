@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -32,6 +33,7 @@ type stressFlags struct {
 	timeout     time.Duration
 	dryRun      bool
 	output      string
+	save        bool
 }
 
 func newStressCommand() *cobra.Command {
@@ -64,7 +66,8 @@ them explicitly with --route. Routes with required parameters need --param.`,
 	fl.DurationVarP(&f.duration, "duration", "d", 0, "how long to send requests, e.g. 30s (default 10s when -n isn't set)")
 	fl.DurationVar(&f.timeout, "timeout", 30*time.Second, "per-request timeout")
 	fl.BoolVar(&f.dryRun, "dry-run", false, "list the requests that would be sent, send nothing")
-	fl.StringVarP(&f.output, "output", "o", "", "also write a JSON report to this file (for the dashboard or CI)")
+	fl.StringVarP(&f.output, "output", "o", "", "also write a JSON report to this file (for CI)")
+	fl.BoolVar(&f.save, "save", false, "also save the report to "+DefaultReportsDir+"/ for `riven-engine serve`")
 
 	return cmd
 }
@@ -126,7 +129,14 @@ func runStress(cmd *cobra.Command, f stressFlags) error {
 		return err
 	}
 
-	if f.output != "" {
+	output := f.output
+	if f.save && output == "" {
+		if err := os.MkdirAll(DefaultReportsDir, 0o755); err != nil {
+			return fmt.Errorf("create %s: %w", DefaultReportsDir, err)
+		}
+		output = filepath.Join(DefaultReportsDir, "stress-"+started.UTC().Format("20060102-150405")+".json")
+	}
+	if output != "" {
 		rep := report.NewStress(report.Run{
 			EngineVersion: Version,
 			Manifest:      m,
@@ -137,10 +147,10 @@ func runStress(cmd *cobra.Command, f stressFlags) error {
 			Interrupted:   interrupted,
 			Summary:       summary,
 		})
-		if err := report.Write(f.output, rep); err != nil {
+		if err := report.Write(output, rep); err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "Wrote %s\n", f.output)
+		fmt.Fprintf(out, "Wrote %s\n", output)
 	}
 	return nil
 }

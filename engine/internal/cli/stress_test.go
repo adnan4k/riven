@@ -160,3 +160,19 @@ func TestStressWritesJSONReport(t *testing.T) {
 		t.Errorf("report body = %+v", rep)
 	}
 }
+
+func TestStressSaveWritesIntoReportsDir(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer srv.Close()
+	sample := sampleAbs(t) // before Chdir: the relative path stops working after
+	t.Chdir(t.TempDir())
+
+	stdout, _, err := run(t, "stress", "-m", sample, "--base-url", srv.URL, "-n", "2", "--save")
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, _ := filepath.Glob(filepath.Join(DefaultReportsDir, "stress-*.json"))
+	if len(files) != 1 || !strings.Contains(stdout, "Wrote "+files[0]) {
+		t.Errorf("files = %v, stdout = %q", files, stdout)
+	}
+}

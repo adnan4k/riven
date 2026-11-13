@@ -4,3 +4,7 @@ composer.lock
 .qodo/
 /engine/bin/
 /engine/riven-engine
+/engine/web/node_modules/
+/engine/web/dist/*
+!/engine/web/dist/.gitkeep
+/riven-reports/

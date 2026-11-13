@@ -65,12 +65,12 @@ Work top to bottom; don't start a milestone until the previous one's gate passes
 - [x] Static OpenAPI 3.1 builder from manifest (paths, params, request bodies from rules) (`engine/openapi`, `riven-engine docs`)
   - Done when: output passes an OpenAPI validator (official OAS 3.1 JSON Schema + every embedded schema compiled as 2020-12 + path-param/operationId checks, in `go test`)
 - [x] Rule → JSON Schema mapping table (required, string, email, integer, min/max, in, array, nullable…) (`engine/rules`)
-- [ ] Claude API pass: fill descriptions/examples only where static data is missing; cache by route hash
+- [ ] (deferred: AI later, decided 2026-11-13) Claude API pass: fill descriptions/examples only where static data is missing; cache by route hash
   - Done when: static output alone is valid; AI only adds fields; re-run with no changes makes 0 API calls
-- [ ] Eval set: a few fixture routes with expected descriptions, scored, to compare prompts/models
+- [ ] (deferred with the AI pass) Eval set: a few fixture routes with expected descriptions, scored, to compare prompts/models
 
 ## M5 — Dashboard
-- [ ] React app (Vite) built into `go:embed`, served by `riven-engine serve`
+- [~] React app (Vite) built into `go:embed`, served by `riven-engine serve`
 - [ ] Views: routes list, route detail (docs), stress reports
 
 ## M6 — Ship

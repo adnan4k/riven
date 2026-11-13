@@ -13,6 +13,16 @@ var update = flag.Bool("update", false, "rewrite golden files in testdata/")
 
 const sampleManifest = "../../testdata/riven-app.json"
 
+// sampleAbs is the sample manifest's absolute path, for tests that chdir.
+func sampleAbs(t *testing.T) string {
+	t.Helper()
+	p, err := filepath.Abs(sampleManifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
 func TestRoutesGolden(t *testing.T) {
 	stdout, stderr, err := run(t, "routes", "--manifest", sampleManifest)
 	if err != nil {
