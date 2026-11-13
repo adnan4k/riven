@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestStressDryRunOnSampleManifest(t *testing.T) {
@@ -64,8 +65,10 @@ func TestStressSendsLoadWithHeaders(t *testing.T) {
 	if hits.Load() != 20 || authed.Load() != 20 {
 		t.Errorf("hits = %d, with headers = %d; want 20, 20", hits.Load(), authed.Load())
 	}
-	if !strings.HasPrefix(stdout, "20 requests in ") || !strings.Contains(stdout, "GET /api/users                 200×10") {
-		t.Errorf("stdout = %q", stdout)
+	for _, want := range []string{"| GET /api/users | 10       |", "| Total          | 20       |", "200×20", "| 0.0%   |", "20 requests in "} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("stdout missing %q:\n%s", want, stdout)
+		}
 	}
 }
 
@@ -78,6 +81,34 @@ func TestStressRejectsBadFlags(t *testing.T) {
 		_, _, err := run(t, append([]string{"stress", "-m", sampleManifest, "--dry-run"}, args...)...)
 		if err == nil {
 			t.Errorf("%v: want an error", args)
+		}
+	}
+}
+
+func TestStressSummaryCountsFailures(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer srv.Close()
+
+	stdout, _, err := run(t, "stress", "-m", sampleManifest, "--base-url", srv.URL, "-n", "10", "-c", "2")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, want := range []string{"| GET /          | 5        |", "| 100.0% | 500×5", "| 50.0%  | 200×5 500×5"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("stdout missing %q:\n%s", want, stdout)
+		}
+	}
+}
+
+func TestFormatMs(t *testing.T) {
+	for d, want := range map[time.Duration]string{0: "-", 420 * time.Microsecond: "0.4ms", 12345 * time.Microsecond: "12.3ms", 1500 * time.Millisecond: "1.50s"} {
+		if got := ms(d); got != want {
+			t.Errorf("ms(%v) = %q, want %q", d, got, want)
 		}
 	}
 }

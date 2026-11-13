@@ -8,9 +8,11 @@ import (
 	"os"
 	"os/signal"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/faysal/riven/engine/internal/table"
 	"github.com/faysal/riven/engine/manifest"
 	"github.com/faysal/riven/engine/stress"
 	"github.com/faysal/riven/engine/targets"
@@ -105,13 +107,14 @@ func runStress(cmd *cobra.Command, f stressFlags) error {
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
 	defer stop()
 
-	start := time.Now()
 	results, err := stress.Run(ctx, stress.NewClient(cfg), cfg, plan.Targets)
 	if err != nil && ctx.Err() == nil {
 		return err
 	}
-	printSummary(out, plan.Targets, results, time.Since(start))
-	return nil
+	if ctx.Err() != nil {
+		fmt.Fprintln(errOut, "interrupted: showing results so far")
+	}
+	return printSummary(out, stress.Summarize(plan.Targets, results))
 }
 
 func (f stressFlags) targetOptions() (targets.Options, error) {
@@ -141,33 +144,71 @@ func (f stressFlags) targetOptions() (targets.Options, error) {
 	return opts, nil
 }
 
-// printSummary is a placeholder until the metrics task: counts per target and status.
-func printSummary(w io.Writer, ts []stress.Target, results []stress.Result, elapsed time.Duration) {
-	type count struct {
-		status map[int]int
-		errors int
+func printSummary(w io.Writer, s stress.Summary) error {
+	rows := make([][]string, 0, len(s.Targets)+1)
+	for _, t := range s.Targets {
+		rows = append(rows, statsRow(t.Name, t.Stats))
 	}
-	per := make([]count, len(ts))
-	for i := range per {
-		per[i].status = map[int]int{}
-	}
-	for _, r := range results {
-		if r.Err != nil {
-			per[r.Target].errors++
-		} else {
-			per[r.Target].status[r.Status]++
-		}
+	if len(s.Targets) > 1 {
+		rows = append(rows, statsRow("Total", s.Total))
 	}
 
-	fmt.Fprintf(w, "%d requests in %s\n", len(results), elapsed.Round(time.Millisecond))
-	for i, t := range ts {
-		var parts []string
-		for _, s := range slices.Sorted(maps.Keys(per[i].status)) {
-			parts = append(parts, fmt.Sprintf("%d×%d", s, per[i].status[s]))
-		}
-		if per[i].errors > 0 {
-			parts = append(parts, fmt.Sprintf("errors×%d", per[i].errors))
-		}
-		fmt.Fprintf(w, "  %-30s %s\n", t.Name, strings.Join(parts, "  "))
+	err := table.Render(w, []string{"Route", "Requests", "RPS", "p50", "p95", "p99", "Max", "Failed", "Statuses"}, rows)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(w, "%d requests in %s, %.1f req/s\n", s.Total.Requests, s.Total.Elapsed.Round(time.Millisecond), s.Total.RPS)
+	if len(s.Total.Errors) > 0 {
+		fmt.Fprintf(w, "Transport errors: %s\n", counts(s.Total.Errors))
+	}
+	_, err = fmt.Fprintln(w, "Failed = transport errors + 5xx. Latency excludes transport errors.")
+	return err
+}
+
+func statsRow(name string, st stress.Stats) []string {
+	statuses := map[string]int{}
+	for code, n := range st.Statuses {
+		statuses[strconv.Itoa(code)] = n
+	}
+	if n := sum(st.Errors); n > 0 {
+		statuses["error"] = n
+	}
+
+	return []string{
+		name,
+		strconv.Itoa(st.Requests),
+		fmt.Sprintf("%.1f", st.RPS),
+		ms(st.Latency.P50), ms(st.Latency.P95), ms(st.Latency.P99), ms(st.Latency.Max),
+		fmt.Sprintf("%.1f%%", st.ErrorRate*100),
+		counts(statuses),
+	}
+}
+
+// counts formats {"200": 3, "500": 1} as "200×3 500×1", sorted by key.
+func counts(m map[string]int) string {
+	var parts []string
+	for _, k := range slices.Sorted(maps.Keys(m)) {
+		parts = append(parts, fmt.Sprintf("%s×%d", k, m[k]))
+	}
+	return strings.Join(parts, " ")
+}
+
+func sum(m map[string]int) int {
+	n := 0
+	for _, v := range m {
+		n += v
+	}
+	return n
+}
+
+func ms(d time.Duration) string {
+	switch {
+	case d == 0:
+		return "-"
+	case d >= time.Second:
+		return fmt.Sprintf("%.2fs", d.Seconds())
+	default:
+		return fmt.Sprintf("%.1fms", float64(d)/float64(time.Millisecond))
 	}
 }

@@ -53,10 +53,11 @@ Work top to bottom; don't start a milestone until the previous one's gate passes
   - Done when: `httptest` tests prove exact request counts, the concurrency cap, connection reuse, duration stop and cancel; race detector clean
 - [x] Per-route targeting from manifest, param substitution, auth header injection (`engine/targets`, `riven-engine stress`)
   - Done when: `--dry-run` lists the right URLs for riven-app; params escaped and checked against `where()`; headers reach the server in an `httptest` run
-- [ ] Request bodies for routes with rules (generate from rules or `--body`), so POST/PUT don't just measure 422s
-- [ ] Metrics: p50/p95/p99 latency, RPS, error rate, status histogram
+- [x] Metrics: p50/p95/p99 latency, RPS, error rate, status histogram (`stress.Summarize`, table in `riven-engine stress`)
+  - Done when: exact percentiles/RPS/error rate on fixed results in tests; real timeouts and refused connections classified; table printed for riven-app
 - [ ] JSON report output (consumed later by the dashboard)
   - Done when: run against `riven-app` locally produces a report; a test uses `httptest.Server`
+- [ ] Request bodies for routes with rules (generate from rules or `--body`), after M4's rule mapping; so POST/PUT don't just measure 422s
 
 ## M4 — Docs (static + AI)
 - [ ] Static OpenAPI 3.1 builder from manifest (paths, params, request bodies from rules)
@@ -174,3 +175,4 @@ Deferred (additive, no version bump needed):
 | 2026-11-13 | One shared sample manifest (`engine/testdata/riven-app.json`, a real export), validated against the schema by a Pest test; golden files for CLI output with a `-update` flag | Both halves test against the same file, so schema drift fails on the PHP side before Go tests silently pass on stale data; golden files make any output change show up as a reviewable diff |
 | 2026-11-13 | Stress pool: N workers pull request numbers from an atomic counter (round-robin over targets), per-worker result slices merged at the end, every `Result` kept; client sized to `MaxIdleConnsPerHost = concurrency`, no redirects followed; duration stops issuing but lets in-flight requests finish, Ctrl-C drops cut-off requests | No locks/channels on the hot path; keeping raw results gives exact percentiles (memory is ~100 B/request, fine for runs up to millions; switch to a histogram if needed); Go's default 2 idle conns/host would measure TCP handshakes instead of the app |
 | 2026-11-13 | Stress targeting: GET routes only by default, others only via `--route` (id or name, `*` wildcard); missing required params skip the route with a reason; `where()` patterns checked as a full match (RE2, PCRE-only patterns skipped); `Accept: application/json` by default; warnings for likely 401 (resolved `Authenticate` middleware, no credentials) and 422 (FormRequest with rules or unknown rules, no body yet) | Load-testing writes data, so it must be opt-in; a skipped route with a reason beats sending a literal `{user}`; JSON Accept makes Laravel return 401/422 JSON instead of redirects or HTML, so statuses mean what they say |
+| 2026-11-13 | Metrics: nearest-rank percentiles on all samples (no interpolation); latency only for requests that got a response; failed = transport errors + 5xx (4xx counted, not failed); RPS from first start to last response end; transport errors grouped by kind | Nearest-rank always reports a real request, so p99 of a small run is the slowest one, not an invented value; timeouts would otherwise show up as latency = the timeout setting; 401/422 are often expected here (no token or body yet), so counting them as failures would hide real 5xx |
