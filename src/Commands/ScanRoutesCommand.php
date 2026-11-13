@@ -13,7 +13,7 @@ class ScanRoutesCommand extends Command
 
     public function handle(RouteScanner $scanner): int
     {
-        $routes = $scanner->scan();
+        ['routes' => $routes, 'warnings' => $warnings] = $scanner->scan();
 
         if ($routes === []) {
             $this->warn('No routes found.');
@@ -22,14 +22,21 @@ class ScanRoutesCommand extends Command
         }
 
         $this->table(
-            ['URI', 'Methods', 'Name', 'Action'],
+            ['URI', 'Methods', 'Name', 'Action', 'Middleware'],
             array_map(fn (array $route) => [
                 $route['uri'],
                 implode('|', $route['methods']),
                 $route['name'] ?? '',
-                $route['action'],
+                $route['action']['type'] === 'closure'
+                    ? 'Closure'
+                    : $route['action']['class'].'@'.$route['action']['method'],
+                implode(', ', $route['middleware']),
             ], $routes),
         );
+
+        foreach ($warnings as $warning) {
+            $this->warn("{$warning['route_id']}: {$warning['message']}");
+        }
 
         return self::SUCCESS;
     }

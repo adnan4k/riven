@@ -10,7 +10,11 @@ class RivenServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->singleton(RouteScanner::class);
+        $this->app->singleton(RouteScanner::class, fn ($app) => new RouteScanner(
+            $app['router'],
+            RouteScanner::DEFAULT_EXCLUDED_URIS,
+            $app->basePath('vendor'),
+        ));
     }
 
     public function boot(): void

@@ -19,9 +19,9 @@ Work top to bottom; don't start a milestone until the previous one's gate passes
 ## M1 — PHP collector
 - [x] `riven:scan` (`src/Commands/ScanRoutesCommand.php`) prints routes as a table
   - Done when: output shows uri, methods, name, action for `riven-app` routes
-- [ ] RouteScanner filtering: exclude framework/vendor routes (e.g. `_ignition`, `sanctum/*`, `storage/*`, closures from vendor providers); configurable
+- [~] RouteScanner filtering: exclude framework/vendor routes (e.g. `_ignition`, `sanctum/*`, `storage/*`, closures from vendor providers); configurable
   - Done when: a test registers app + vendor-like routes and only app routes come back
-- [ ] RouteScanner enrichment: middleware (resolved, not aliases only), parameter names + optional flag + `where` patterns, domain, action type (controller / invokable / closure)
+- [~] RouteScanner enrichment: middleware (resolved, not aliases only), parameter names + optional flag + `where` patterns, domain, action type (controller / invokable / closure)
   - Done when: tests cover each field on a fixture route
 - [ ] Controller reflection: resolve the FormRequest type-hinted on the action
   - Done when: a fixture controller method with `StoreUserRequest $request` yields that class name
@@ -100,6 +100,7 @@ Unknown values are `null`, never guessed. Non-fatal problems go in `warnings`.
         "method": "store"
       },
       "middleware": ["api", "auth:sanctum"],
+      "middleware_resolved": ["Illuminate\\Routing\\Middleware\\SubstituteBindings", "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"],
       "parameters": [
         { "name": "user", "required": true, "pattern": null }
       ],
@@ -116,8 +117,14 @@ Unknown values are `null`, never guessed. Non-fatal problems go in `warnings`.
 }
 ```
 
+Field notes:
+- `id`: one per route, `"<first non-HEAD method> /<uri>"` (e.g. `PUT /users/{user}` for PUT|PATCH).
+- `action.type`: `controller` | `invokable` | `closure`; `class`/`method` are `null` for closures.
+- `middleware`: as declared (aliases, groups, controller middleware). `middleware_resolved`:
+  class names after expanding aliases/groups and removing `withoutMiddleware()` exclusions.
+- `parameters`: includes domain parameters; `pattern` comes from `where()` (incl. global patterns).
+
 Open questions (decide before freezing v1):
-- `id` format: `METHOD uri` per method, or one entry per route with multiple methods?
 - Rules as raw Laravel strings (engine maps them) vs pre-normalized objects?
 - Include Resource field shapes now, or leave for a later schema version?
 
@@ -127,3 +134,7 @@ Open questions (decide before freezing v1):
 | Date | Decision | Why |
 |------|----------|-----|
 | 2026-11-13 | PHP collects, Go processes, JSON manifest between them | Collector needs the booted app; everything else is faster/more portable in a single binary |
+| 2026-11-13 | Route filtering by URI patterns + "action defined under vendor/" (reflection on closure/controller file); `Route::view`/`redirect` controllers allowlisted | No route carries its registering provider; the action's file is the most reliable ownership signal |
+| 2026-11-13 | Route `id` = first non-HEAD method + uri, one entry per route | Keeps one manifest entry per Laravel route; methods stay in `methods[]` |
+| 2026-11-13 | Store both declared and resolved middleware (additive, schema stays v1) | Declared names explain the route to humans/AI; resolved classes make auth detection reliable |
+| 2026-11-13 | `RouteScanner::scan()` returns `{routes, warnings}` | Manifest-shaped; non-fatal problems (e.g. unbuildable controller) surface as warnings, not crashes |
