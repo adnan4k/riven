@@ -13,8 +13,23 @@ class ScanRoutesCommand extends Command
 
     public function handle(RouteScanner $scanner): int
     {
-        // TODO (M1): call $scanner->scan() and render the routes with $this->table().
-        $this->info('riven:scan is not implemented yet.');
+        $routes = $scanner->scan();
+
+        if ($routes === []) {
+            $this->warn('No routes found.');
+
+            return self::SUCCESS;
+        }
+
+        $this->table(
+            ['URI', 'Methods', 'Name', 'Action'],
+            array_map(fn (array $route) => [
+                $route['uri'],
+                implode('|', $route['methods']),
+                $route['name'] ?? '',
+                $route['action'],
+            ], $routes),
+        );
 
         return self::SUCCESS;
     }

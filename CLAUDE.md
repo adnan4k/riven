@@ -46,3 +46,4 @@ is drafted in `PLAN.md` (Manifest contract). Any change to it must bump
 - Choose architecture on technical merit, not for learning's sake
 - Keep answers concise
 - After a task is reviewed and done, update its checkbox in `PLAN.md`
+- Never run `git commit`; leave changes for me to review and commit

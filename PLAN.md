@@ -17,7 +17,7 @@ Work top to bottom; don't start a milestone until the previous one's gate passes
 **Gate:** tests run in the package and the host app sees the provider.
 
 ## M1 — PHP collector
-- [ ] `riven:scan` (`src/Commands/ScanRoutesCommand.php`) prints routes as a table
+- [x] `riven:scan` (`src/Commands/ScanRoutesCommand.php`) prints routes as a table
   - Done when: output shows uri, methods, name, action for `riven-app` routes
 - [ ] RouteScanner filtering: exclude framework/vendor routes (e.g. `_ignition`, `sanctum/*`, `storage/*`, closures from vendor providers); configurable
   - Done when: a test registers app + vendor-like routes and only app routes come back
