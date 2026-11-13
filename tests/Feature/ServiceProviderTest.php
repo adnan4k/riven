@@ -7,3 +7,7 @@ it('registers RouteScanner as a singleton', function () {
         ->toBeInstanceOf(RouteScanner::class)
         ->toBe(app(RouteScanner::class));
 });
+
+it('registers the riven:scan command', function () {
+    $this->artisan('riven:scan')->assertSuccessful();
+});

@@ -1,25 +1,24 @@
 <?php
 
 namespace Riven;
-use  Illuminate\Support\ServiceProvider;
+
+use Illuminate\Support\ServiceProvider;
+use Riven\Commands\ScanRoutesCommand;
 use Riven\Scanner\RouteScanner;
+
 class RivenServiceProvider extends ServiceProvider
 {
-    public function register()
+    public function register(): void
     {
-        $this->app->singleton(RouteScanner::class, function () {
-            return new \Riven\Scanner\RouteScanner();
-        });
+        $this->app->singleton(RouteScanner::class);
     }
 
-
-    public function boot()
+    public function boot(): void
     {
-        //
-         if($this->app->runningInConsole()){
+        if ($this->app->runningInConsole()) {
             $this->commands([
-                \Riven\Scanner\ScanRouteCommands::class
+                ScanRoutesCommand::class,
             ]);
-    }
+        }
     }
 }
