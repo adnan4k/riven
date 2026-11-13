@@ -84,7 +84,8 @@ Work top to bottom; don't start a milestone until the previous one's gate passes
 - [ ] (deferred with the AI work) AI test generator (Pest tests from manifest + docs), with an eval like M4
 - [x] Cross-platform binaries (goreleaser), checksums (`.goreleaser.yaml`, `.github/workflows/release.yml`, CI in `ci.yml`)
   - Done when: all 6 targets cross-compile static with the version stamped, archives match the installer's naming, `checksums.txt` verifies, release binary serves the embedded UI (checked locally by hand; goreleaser itself first runs in CI)
-- [ ] Composer post-install downloads the matching binary (verify checksum)
+- [x] Composer post-install downloads the matching binary (verify checksum) (`php artisan riven:install-engine`, `src/Engine/`; apps add it to `post-autoload-dump`)
+  - Done when: tests cover naming per OS/arch, checksum mismatch/missing entry refused, old binary kept on failure, dev versions skipped, same version skipped; a real install from a local release mirror runs in riven-app
 - [ ] README, LICENSE, tag v0.1.0, publish to Packagist
 
 ---
@@ -196,3 +197,4 @@ Deferred (additive, no version bump needed):
 | 2026-11-13 | Dashboard can act: `POST /api/try` (proxy, app base URL only), `POST /api/stress` + polling `GET /api/stress` (one run at a time, saved as a report), `POST /api/rescan` (runs `php artisan riven:export`); all POSTs require JSON, a same-origin Origin and a loopback Host | The browser can't call the app (CORS), so the engine proxies; JSON-only + Origin + Host checks stop other websites and DNS rebinding from driving a localhost tool that sends load and runs artisan |
 | 2026-11-13 | Stress results get a per-second `timeline` (report v1, additive) and a thread-safe `stress.Live` recorder for live views | Latency-over-time charts for live and saved runs from the same data |
 | 2026-11-13 | Dashboard on React 19, dark mode by default | shadcn components are written for React 19 (ref as a prop); on 18 refs were silently dropped |
+| 2026-11-13 | Engine install = `riven:install-engine` artisan command run from the app's `post-autoload-dump` script, not a Composer plugin; downloads `riven-engine_<ver>_<os>_<arch>` + `checksums.txt` from the GitHub release matching the installed package version, verifies sha256 before unpacking, installs atomically to `vendor/bin/riven-engine`; dev versions are skipped with build instructions | Composer 2.2+ asks users to trust plugins and they run before the app exists; an artisan command is testable with `Http::fake`/`Process::fake`, rerunnable by hand, and a script hook is one line in the README; never installing an unverified file is the point of the checksum |

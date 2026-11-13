@@ -5,7 +5,9 @@ namespace Riven;
 use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Support\ServiceProvider;
 use Riven\Commands\ExportManifestCommand;
+use Riven\Commands\InstallEngineCommand;
 use Riven\Commands\ScanRoutesCommand;
+use Riven\Engine\EngineInstaller;
 use Riven\Scanner\ActionReflector;
 use Riven\Scanner\ResourceDetector;
 use Riven\Scanner\RouteScanner;
@@ -38,6 +40,11 @@ class RivenServiceProvider extends ServiceProvider
                 includedUris: $config['include'],
             );
         });
+
+        $this->app->bind(EngineInstaller::class, fn ($app) => new EngineInstaller(
+            target: $app['config']['riven.engine.path'] ?? $app->basePath('vendor/bin/riven-engine'.(PHP_OS_FAMILY === 'Windows' ? '.exe' : '')),
+            releasesUrl: $app['config']['riven.engine.releases_url'] ?? EngineInstaller::RELEASES_URL,
+        ));
     }
 
     public function boot(): void
@@ -48,6 +55,7 @@ class RivenServiceProvider extends ServiceProvider
             $this->commands([
                 ScanRoutesCommand::class,
                 ExportManifestCommand::class,
+                InstallEngineCommand::class,
             ]);
         }
     }
