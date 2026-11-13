@@ -32,6 +32,7 @@ type Skipped struct {
 }
 
 type Plan struct {
+	BaseURL  string // the one actually used: the option or the manifest's app.url
 	Targets  []stress.Target
 	Skipped  []Skipped
 	Warnings []string // targets that will be sent but probably fail (401, 422)
@@ -51,7 +52,7 @@ func Build(m *manifest.Manifest, opts Options) (Plan, error) {
 		return Plan{}, err
 	}
 
-	var plan Plan
+	plan := Plan{BaseURL: base.String()}
 	for _, r := range routes {
 		u, err := routeURL(base, r, opts.Params)
 		if err != nil {
@@ -213,7 +214,7 @@ func checkPattern(name, value string, pattern *string) error {
 
 func warnings(r manifest.Route, method string, h http.Header) []string {
 	var out []string
-	if needsAuth(r) && h.Get("Authorization") == "" && h.Get("Cookie") == "" {
+	if r.RequiresAuth() && h.Get("Authorization") == "" && h.Get("Cookie") == "" {
 		out = append(out, r.ID+": requires authentication but no --token or --header was given; expect 401")
 	}
 	// nil rules mean "unknown" (rules() needed a live request), so they still validate; only {} is safe.
@@ -222,16 +223,6 @@ func warnings(r manifest.Route, method string, h http.Header) []string {
 		out = append(out, r.ID+": validates a request body, which isn't sent yet; expect 422")
 	}
 	return out
-}
-
-func needsAuth(r manifest.Route) bool {
-	for _, mw := range r.MiddlewareResolved {
-		class, _, _ := strings.Cut(mw, ":") // "…\Authenticate:sanctum"
-		if strings.HasSuffix(class, `\Authenticate`) || strings.HasSuffix(class, `\AuthenticateWithBasicAuth`) {
-			return true
-		}
-	}
-	return false
 }
 
 func skippedSummary(skipped []Skipped) string {

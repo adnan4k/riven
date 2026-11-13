@@ -1,8 +1,11 @@
 package cli
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -110,5 +113,50 @@ func TestFormatMs(t *testing.T) {
 		if got := ms(d); got != want {
 			t.Errorf("ms(%v) = %q, want %q", d, got, want)
 		}
+	}
+}
+
+func TestStressWritesJSONReport(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer srv.Close()
+	path := filepath.Join(t.TempDir(), "report.json")
+
+	stdout, _, err := run(t, "stress", "-m", sampleManifest, "--base-url", srv.URL, "-n", "6", "-c", "2", "-o", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout, "Wrote "+path) {
+		t.Errorf("stdout = %q", stdout)
+	}
+
+	var rep struct {
+		ReportVersion int    `json:"report_version"`
+		Kind          string `json:"kind"`
+		Config        struct {
+			BaseURL     string `json:"base_url"`
+			Concurrency int    `json:"concurrency"`
+			Requests    int    `json:"requests"`
+		} `json:"config"`
+		Summary struct {
+			Requests int            `json:"requests"`
+			Statuses map[string]int `json:"statuses"`
+		} `json:"summary"`
+		Routes []struct {
+			RouteID string `json:"route_id"`
+		} `json:"routes"`
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &rep); err != nil {
+		t.Fatal(err)
+	}
+
+	if rep.ReportVersion != 1 || rep.Kind != "stress" || rep.Config.BaseURL != srv.URL || rep.Config.Concurrency != 2 || rep.Config.Requests != 6 {
+		t.Errorf("report header = %+v", rep)
+	}
+	if rep.Summary.Requests != 6 || rep.Summary.Statuses["200"] != 6 || len(rep.Routes) != 2 || rep.Routes[0].RouteID != "GET /api/users" {
+		t.Errorf("report body = %+v", rep)
 	}
 }

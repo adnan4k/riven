@@ -14,6 +14,7 @@ import (
 
 	"github.com/faysal/riven/engine/internal/table"
 	"github.com/faysal/riven/engine/manifest"
+	"github.com/faysal/riven/engine/report"
 	"github.com/faysal/riven/engine/stress"
 	"github.com/faysal/riven/engine/targets"
 	"github.com/spf13/cobra"
@@ -30,6 +31,7 @@ type stressFlags struct {
 	duration    time.Duration
 	timeout     time.Duration
 	dryRun      bool
+	output      string
 }
 
 func newStressCommand() *cobra.Command {
@@ -62,6 +64,7 @@ them explicitly with --route. Routes with required parameters need --param.`,
 	fl.DurationVarP(&f.duration, "duration", "d", 0, "how long to send requests, e.g. 30s (default 10s when -n isn't set)")
 	fl.DurationVar(&f.timeout, "timeout", 30*time.Second, "per-request timeout")
 	fl.BoolVar(&f.dryRun, "dry-run", false, "list the requests that would be sent, send nothing")
+	fl.StringVarP(&f.output, "output", "o", "", "also write a JSON report to this file (for the dashboard or CI)")
 
 	return cmd
 }
@@ -107,14 +110,39 @@ func runStress(cmd *cobra.Command, f stressFlags) error {
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt)
 	defer stop()
 
+	started := time.Now()
 	results, err := stress.Run(ctx, stress.NewClient(cfg), cfg, plan.Targets)
+	finished := time.Now()
 	if err != nil && ctx.Err() == nil {
 		return err
 	}
-	if ctx.Err() != nil {
+	interrupted := ctx.Err() != nil
+	if interrupted {
 		fmt.Fprintln(errOut, "interrupted: showing results so far")
 	}
-	return printSummary(out, stress.Summarize(plan.Targets, results))
+
+	summary := stress.Summarize(plan.Targets, results)
+	if err := printSummary(out, summary); err != nil {
+		return err
+	}
+
+	if f.output != "" {
+		rep := report.NewStress(report.Run{
+			EngineVersion: Version,
+			Manifest:      m,
+			BaseURL:       plan.BaseURL,
+			Config:        cfg,
+			StartedAt:     started,
+			FinishedAt:    finished,
+			Interrupted:   interrupted,
+			Summary:       summary,
+		})
+		if err := report.Write(f.output, rep); err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "Wrote %s\n", f.output)
+	}
+	return nil
 }
 
 func (f stressFlags) targetOptions() (targets.Options, error) {

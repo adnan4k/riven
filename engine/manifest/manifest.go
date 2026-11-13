@@ -5,7 +5,10 @@
 // pointers, nil maps), so "unknown" never looks like a real zero value.
 package manifest
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // SupportedVersion is the schema_version this engine understands.
 // Additive changes keep the version, so unknown fields are ignored on load.
@@ -91,4 +94,16 @@ type Warning struct {
 	RouteID string      `json:"route_id"`
 	Code    WarningCode `json:"code"` // new codes are additive: handle unknown ones
 	Message string      `json:"message"`
+}
+
+// RequiresAuth reports whether Laravel's auth middleware guards the route,
+// from the resolved class names ("…\Authenticate:sanctum" included).
+func (r Route) RequiresAuth() bool {
+	for _, mw := range r.MiddlewareResolved {
+		class, _, _ := strings.Cut(mw, ":")
+		if strings.HasSuffix(class, `\Authenticate`) || strings.HasSuffix(class, `\AuthenticateWithBasicAuth`) {
+			return true
+		}
+	}
+	return false
 }

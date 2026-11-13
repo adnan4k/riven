@@ -142,8 +142,11 @@ func TestDomainRoutesUseTheirHostAndTheBasePort(t *testing.T) {
 func TestBaseURL(t *testing.T) {
 	m := app(route("GET /"))
 
-	if p := mustBuild(t, m, Options{BaseURL: "https://staging.example.com/sub/"}); p.Targets[0].URL != "https://staging.example.com/sub" {
-		t.Errorf("override + base path: %s", p.Targets[0].URL)
+	if p := mustBuild(t, m, Options{}); p.BaseURL != "http://localhost:8000" {
+		t.Errorf("default base URL = %q, want the manifest's app.url", p.BaseURL)
+	}
+	if p := mustBuild(t, m, Options{BaseURL: "https://staging.example.com/sub/"}); p.Targets[0].URL != "https://staging.example.com/sub" || p.BaseURL != "https://staging.example.com/sub/" {
+		t.Errorf("override + base path: %s (base %s)", p.Targets[0].URL, p.BaseURL)
 	}
 
 	m.App.URL = nil

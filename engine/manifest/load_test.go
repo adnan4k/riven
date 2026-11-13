@@ -164,3 +164,17 @@ func findRoute(t *testing.T, m *Manifest, id string) Route {
 	t.Fatalf("route %q not in manifest", id)
 	return Route{}
 }
+
+func TestRequiresAuth(t *testing.T) {
+	for mw, want := range map[string]bool{
+		`Illuminate\Auth\Middleware\Authenticate`:                true,
+		`Illuminate\Auth\Middleware\Authenticate:sanctum`:        true,
+		`Illuminate\Auth\Middleware\AuthenticateWithBasicAuth`:   true,
+		`Illuminate\Routing\Middleware\SubstituteBindings`:       false,
+		`App\Http\Middleware\AuthenticateSessionsAndOtherThings`: false,
+	} {
+		if got := (Route{MiddlewareResolved: []string{mw}}).RequiresAuth(); got != want {
+			t.Errorf("%s: RequiresAuth = %v, want %v", mw, got, want)
+		}
+	}
+}
