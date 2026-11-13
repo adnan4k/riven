@@ -18,5 +18,7 @@ func NewRootCommand() *cobra.Command {
 
 	root.PersistentFlags().StringP("manifest", "m", "riven.json", "path to the manifest from `php artisan riven:export`")
 
+	root.AddCommand(newRoutesCommand())
+
 	return root
 }
