@@ -39,11 +39,13 @@ is drafted in `PLAN.md` (Manifest contract). Any change to it must bump
 
 ## How I want to work
 - I'm learning: I've used Laravel before, but mostly with AI-written code
-- Give me the strategy first; I write the code myself, then you review it
-- Don't write implementation code for me unless I explicitly ask. Small
-  snippets to illustrate an API are fine
+- Claude writes the implementation and tests; I read along on my own and
+  won't necessarily report back. Treat a task as reviewed once its tests pass
+  and it's checked in the host app
+- Give a short strategy before each task, and point out what's worth reading
+  in the result (Laravel concepts, surprises, decisions made)
 - Explain the why behind Laravel concepts, briefly
 - Choose architecture on technical merit, not for learning's sake
 - Keep answers concise
-- After a task is reviewed and done, update its checkbox in `PLAN.md`
+- When a task is done, mark it `[x]` in `PLAN.md` and log design decisions
 - Never run `git commit`; leave changes for me to review and commit

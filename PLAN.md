@@ -1,6 +1,6 @@
 # Riven Plan
 
-Status key: `[ ]` todo · `[~]` in progress · `[x]` done (reviewed).
+Status key: `[ ]` todo · `[~]` in progress · `[x]` done (tests pass + checked in host app).
 Each task has a **Done when** line: that is the acceptance check used in review.
 Work top to bottom; don't start a milestone until the previous one's gate passes.
 
@@ -19,13 +19,13 @@ Work top to bottom; don't start a milestone until the previous one's gate passes
 ## M1 — PHP collector
 - [x] `riven:scan` (`src/Commands/ScanRoutesCommand.php`) prints routes as a table
   - Done when: output shows uri, methods, name, action for `riven-app` routes
-- [~] RouteScanner filtering: exclude framework/vendor routes (e.g. `_ignition`, `sanctum/*`, `storage/*`, closures from vendor providers); configurable
+- [x] RouteScanner filtering: exclude framework/vendor routes (e.g. `_ignition`, `sanctum/*`, `storage/*`, closures from vendor providers); configurable
   - Done when: a test registers app + vendor-like routes and only app routes come back
-- [~] RouteScanner enrichment: middleware (resolved, not aliases only), parameter names + optional flag + `where` patterns, domain, action type (controller / invokable / closure)
+- [x] RouteScanner enrichment: middleware (resolved, not aliases only), parameter names + optional flag + `where` patterns, domain, action type (controller / invokable / closure)
   - Done when: tests cover each field on a fixture route
-- [ ] Controller reflection: resolve the FormRequest type-hinted on the action
+- [x] Controller reflection: resolve the FormRequest type-hinted on the action
   - Done when: a fixture controller method with `StoreUserRequest $request` yields that class name
-- [ ] FormRequest rules extraction (`rules()` output, string and array rule formats normalized)
+- [x] FormRequest rules extraction (`rules()` output, string and array rule formats normalized)
   - Done when: rules appear in manifest shape; rules needing a live request are skipped with a `warnings[]` entry, not a crash
 - [ ] Resource detection: return type / `new XResource` / `XResource::collection` (best effort, static)
   - Done when: fixture returns are detected; unknown → `null`, not a guess
@@ -123,9 +123,12 @@ Field notes:
 - `middleware`: as declared (aliases, groups, controller middleware). `middleware_resolved`:
   class names after expanding aliases/groups and removing `withoutMiddleware()` exclusions.
 - `parameters`: includes domain parameters; `pattern` comes from `where()` (incl. global patterns).
+- `request.rules`: `field => [rule strings]`, `null` when there's no FormRequest or `rules()` needs a
+  live request (then a `rules_need_request` warning). Strings are Laravel's own syntax (`max:255`,
+  `in:"a","b"`); rule objects without a string form appear as their class name, closures as `Closure`.
+  Wildcard keys (`items.*.id`) are kept as-is.
 
 Open questions (decide before freezing v1):
-- Rules as raw Laravel strings (engine maps them) vs pre-normalized objects?
 - Include Resource field shapes now, or leave for a later schema version?
 
 ---
@@ -138,3 +141,7 @@ Open questions (decide before freezing v1):
 | 2026-11-13 | Route `id` = first non-HEAD method + uri, one entry per route | Keeps one manifest entry per Laravel route; methods stay in `methods[]` |
 | 2026-11-13 | Store both declared and resolved middleware (additive, schema stays v1) | Declared names explain the route to humans/AI; resolved classes make auth detection reliable |
 | 2026-11-13 | `RouteScanner::scan()` returns `{routes, warnings}` | Manifest-shaped; non-fatal problems (e.g. unbuildable controller) surface as warnings, not crashes |
+| 2026-11-13 | `ActionReflector` reflects the action (closure / controller method) for FormRequest and Resource detection; vendor check keeps reflecting the controller *class* file | `ReflectionMethod::getFileName()` is the declaring file, so inherited vendor methods would misclassify app controllers |
+| 2026-11-13 | Scanner binding resolves the HTTP kernel first | Middleware groups/aliases are synced to the router in the HTTP kernel constructor; Artisan never builds it, so `web` stayed unresolved |
+| 2026-11-13 | Rules stay raw Laravel strings; the Go engine maps them to JSON Schema | Laravel's syntax is already a stable, documented format; mapping once in Go (M4) avoids two parsers |
+| 2026-11-13 | FormRequests are instantiated with `new`, never resolved from the container; PHP warnings in `rules()` are thrown | The container validates FormRequests on resolve; warnings (e.g. `null->id`) would otherwise yield silently wrong rules depending on the caller's error handler |

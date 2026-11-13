@@ -3,6 +3,7 @@
 namespace Riven\Scanner;
 
 use Closure;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Routing\RedirectController;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
@@ -10,6 +11,7 @@ use Illuminate\Routing\ViewController;
 use Illuminate\Support\Str;
 use ReflectionClass;
 use ReflectionFunction;
+use ReflectionNamedType;
 use Throwable;
 
 class RouteScanner
@@ -46,6 +48,8 @@ class RouteScanner
         private Router $router,
         private array $excludedUris = self::DEFAULT_EXCLUDED_URIS,
         ?string $vendorPath = null,
+        private ActionReflector $actions = new ActionReflector,
+        private RulesExtractor $rules = new RulesExtractor,
     ) {
         // Reflection reports resolved paths, so compare against a resolved path too.
         $this->vendorPath = $vendorPath === null ? null : (realpath($vendorPath) ?: $vendorPath);
@@ -83,6 +87,7 @@ class RouteScanner
             'action' => $this->action($route),
             ...$this->middleware($route, $id),
             'parameters' => $this->parameters($route),
+            'request' => $this->request($route, $id),
         ];
     }
 
@@ -159,6 +164,62 @@ class RouteScanner
             'required' => ! str_contains($path, '{'.$name.'?}'),
             'pattern' => $route->wheres[$name] ?? null,
         ], $route->parameterNames());
+    }
+
+    /**
+     * @return array{form_request: ?string, rules: ?array<string, string[]>}
+     */
+    private function request(Route $route, string $id): array
+    {
+        $formRequest = $this->formRequest($route);
+
+        return [
+            'form_request' => $formRequest,
+            'rules' => $formRequest === null ? null : $this->rulesFor($formRequest, $id),
+        ];
+    }
+
+    /**
+     * Null (plus a warning) when rules() depends on the live request: route
+     * parameters, the authenticated user, a custom constructor…
+     *
+     * @return ?array<string, string[]>
+     */
+    private function rulesFor(string $formRequest, string $id): ?array
+    {
+        try {
+            return $this->rules->extract($formRequest);
+        } catch (Throwable $e) {
+            $this->warnings[] = [
+                'route_id' => $id,
+                'code' => 'rules_need_request',
+                'message' => "Could not read {$formRequest}::rules() outside a request: {$e->getMessage()}",
+            ];
+
+            return null;
+        }
+    }
+
+    /**
+     * The first FormRequest type-hinted on the action. Laravel's method injection
+     * builds and validates exactly this class before the action runs.
+     */
+    private function formRequest(Route $route): ?string
+    {
+        $function = $this->actions->reflect($route);
+
+        foreach ($function?->getParameters() ?? [] as $parameter) {
+            $type = $parameter->getType();
+
+            // Union/intersection types (A|B) aren't ReflectionNamedType; Laravel can't inject those either.
+            if ($type instanceof ReflectionNamedType
+                && ! $type->isBuiltin()
+                && is_subclass_of($type->getName(), FormRequest::class)) {
+                return $type->getName();
+            }
+        }
+
+        return null;
     }
 
     private function isExcludedUri(Route $route): bool
