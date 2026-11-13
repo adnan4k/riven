@@ -1,299 +1,89 @@
 <p align="center">
   <img src="https://img.shields.io/packagist/v/faysal/riven?style=flat-square" alt="Packagist Version">
   <img src="https://img.shields.io/packagist/l/faysal/riven?style=flat-square" alt="License">
-  <img src="https://img.shields.io/packagist/php-v/faysal/riven?style=flat-square" alt="PHP Version">
-  <img src="https://img.shields.io/badge/Laravel-11%20%7C%2012%20%7C%2013-FF2D20?style=flat-square" alt="Laravel">
+  <img src="https://img.shields.io/badge/Laravel-11%20%7C%2012%20%7C%2013-FF2D20?style=flat-square" alt="Laravel 11, 12, 13">
 </p>
 
 # Riven
 
-**The all-in-one Laravel developer toolkit.** Riven scans your application's routes, extracts validation rules, detects API resources, generates OpenAPI documentation, stress-tests endpoints, and serves an interactive dashboard — all from a single `composer require`.
+**API docs, a request playground and load tests for your Laravel app, generated from the code you already have.**
 
-```
-composer require faysal/riven --dev
-```
+Riven reads your routes, FormRequest rules and API Resources, then gives you a local dashboard to browse every endpoint, send real requests with generated test data, and stress test them, without writing a spec by hand.
 
----
+![Riven dashboard: docs and Try it for POST /api/users, with a generated body and the 201 response](docs/images/dashboard-docs.png)
 
-## What It Does
+## How it works
 
-| Feature | Description |
-|---------|-------------|
-| **Route Scanning** | Discovers every route, resolves middleware (aliases → classes), detects parameters, `where` patterns, and action types |
-| **Request Extraction** | Finds the `FormRequest` on each action via reflection and pulls out validation rules |
-| **Resource Detection** | Statically detects `JsonResource` / `ResourceCollection` return types from controller bodies using `nikic/php-parser` |
-| **JSON Manifest** | Exports a strict, schema-validated `riven.json` — the single contract between the PHP collector and the Go engine |
-| **OpenAPI Generation** | Builds a full OpenAPI 3.1 spec from the manifest — paths, parameters, request bodies from Laravel rules, response schemas |
-| **AI-Enhanced Docs** | Optionally fills in descriptions and examples using Anthropic or local Ollama models — only where static data is missing |
-| **Stress Testing** | Concurrent load testing with per-route targeting, param substitution, auth injection, and percentile latency reports |
-| **Interactive Dashboard** | A React UI served by the engine — browse routes, read docs, and review stress-test reports in the browser |
-| **Test Generation** | Generates Pest test stubs from the manifest and docs so your API coverage matches your routes |
+1. **The package** (`faysal/riven`) runs inside your app. `php artisan riven:export` writes `riven.json`, which lists every route with its middleware, parameters, validation rules and response Resource.
+2. **The engine** (`riven-engine`, one Go binary) reads that file. It prints the routes, builds an OpenAPI 3.1 document, runs load tests, and serves the dashboard.
+3. **The dashboard** sends Try it and stress requests to your app, and updates by itself when you add or change a route.
 
----
-
-## Quick Start
-
-### 1. Install the package
+## Install
 
 ```bash
 composer require faysal/riven --dev
 ```
 
-The service provider auto-registers via Laravel's package discovery.
-
-### 2. Publish the config (optional)
-
-```bash
-php artisan vendor:publish --tag=riven-config
-```
-
-This creates `config/riven.php` where you can set include/exclude URI patterns and the manifest output path.
-
-### 3. Scan & export
-
-```bash
-# Preview routes in the terminal
-php artisan riven:scan
-
-# Export the JSON manifest
-php artisan riven:export
-```
-
-`riven:export` writes `riven.json` (configurable) validated against the [schema](schema/riven.schema.json).
-
-### 4. Use the engine
-
-The Go engine reads the manifest for everything else:
-
-```bash
-# Print routes from the manifest
-riven-engine routes
-
-# Generate OpenAPI 3.1 spec
-riven-engine docs --format openapi
-
-# Run stress tests
-riven-engine stress --concurrency 50 --duration 30s --auth-header "Bearer $TOKEN"
-
-# Launch the dashboard
-riven-engine serve --port 8080
-```
-
----
-
-## Architecture
-
-Riven is a monorepo with two halves connected by a strict JSON contract:
-
-```
-┌──────────────────────────┐       riven.json        ┌──────────────────────────┐
-│       PHP Collector      │ ──────────────────────▶  │       Go Engine          │
-│                          │   (schema_version: 1)    │                          │
-│  • RouteScanner          │                          │  • Routes viewer         │
-│  • ActionReflector       │                          │  • OpenAPI builder       │
-│  • RulesExtractor        │                          │  • AI doc enhancement    │
-│  • ResourceDetector      │                          │  • Stress tester         │
-│  • ManifestBuilder       │                          │  • Dashboard (React)     │
-│                          │                          │  • Test generator        │
-└──────────────────────────┘                          └──────────────────────────┘
-        Laravel app                                         Single binary
-```
-
-**Why two languages?** The collector needs a booted Laravel application to reflect routes, middleware, FormRequests, and resources. Everything else — docs, stress testing, the dashboard — is faster and more portable as a single, cross-platform Go binary.
-
----
-
-## Configuration
-
-```php
-// config/riven.php
-
-return [
-    // Only scan routes matching these URI patterns (empty = all)
-    'include' => [],
-
-    // Always skip these URIs (takes precedence over include)
-    'exclude' => [
-        'up',
-        '_ignition/*',
-        'sanctum/*',
-        'storage/*',
-    ],
-
-    // Skip routes whose action is defined in vendor/
-    'exclude_vendor' => true,
-
-    // Where riven:export writes the manifest (relative to base_path)
-    'output' => 'riven.json',
-];
-```
-
-Patterns use `Str::is()` — `*` is a wildcard, so `api/*` matches all API routes.
-
----
-
-## Manifest Contract
-
-The manifest (`riven.json`) is the single source of truth between the PHP collector and the Go engine. Its schema is frozen as v1 and strictly validated — unknown fields are rejected.
-
-<details>
-<summary>Example manifest</summary>
+Download the engine binary for your platform after every Composer install, by adding one line to your app's `composer.json`:
 
 ```json
-{
-  "schema_version": 1,
-  "generator": { "name": "faysal/riven", "version": "0.1.0" },
-  "generated_at": "2026-11-13T12:00:00Z",
-  "app": {
-    "name": "my-app",
-    "url": "http://localhost:8000",
-    "laravel_version": "13.42.0",
-    "php_version": "8.4.24"
-  },
-  "routes": [
-    {
-      "id": "POST /api/users",
-      "uri": "api/users",
-      "methods": ["POST"],
-      "name": "users.store",
-      "domain": null,
-      "action": {
-        "type": "controller",
-        "class": "App\\Http\\Controllers\\UserController",
-        "method": "store"
-      },
-      "middleware": ["api", "auth:sanctum"],
-      "middleware_resolved": [
-        "Illuminate\\Routing\\Middleware\\SubstituteBindings",
-        "Illuminate\\Auth\\Middleware\\Authenticate:sanctum"
-      ],
-      "parameters": [
-        { "name": "user", "required": true, "pattern": null }
-      ],
-      "request": {
-        "form_request": "App\\Http\\Requests\\StoreUserRequest",
-        "rules": {
-          "email": ["required", "email"],
-          "name": ["required", "string", "max:255"]
-        }
-      },
-      "response": {
-        "resource": "App\\Http\\Resources\\UserResource",
-        "collection": false
-      }
-    }
-  ],
-  "warnings": [
-    { "route_id": "POST /api/users", "code": "rules_need_request", "message": "..." }
-  ]
+"scripts": {
+    "post-autoload-dump": [
+        "...",
+        "@php artisan riven:install-engine --ansi"
+    ]
 }
 ```
 
-</details>
+The binary comes from this repository's GitHub release for your installed version and is checked against its SHA-256 checksum before it's installed to `vendor/bin/riven-engine`.
 
-### Key rules
-
-- **`id`** — `"<first non-HEAD method> /<uri>"`, one entry per Laravel route
-- **`action.type`** — `controller` | `invokable` | `closure` (class/method are `null` for closures)
-- **`middleware`** — as declared; **`middleware_resolved`** — fully expanded class names
-- **`request.rules`** — `null` when no FormRequest exists or `rules()` needs a live HTTP request (triggers a `rules_need_request` warning)
-- **`response`** — `null` when unknown; Riven never guesses, only detects explicit patterns
-- **`warnings`** — non-fatal issues surface here, never as crashes
-
-Schema versioning: additive changes are minor bumps; renames or removals bump `schema_version`.
-
----
-
-## Engine Commands
-
-| Command | Description |
-|---------|-------------|
-| `riven-engine routes` | Pretty-print routes from the manifest |
-| `riven-engine docs` | Generate OpenAPI 3.1 spec. `--ai=ollama\|anthropic` for AI-enhanced descriptions |
-| `riven-engine stress` | Load test endpoints. `--concurrency`, `--duration`, `--count`, `--auth-header` |
-| `riven-engine serve` | Launch the dashboard UI on `--port` (default 8080) |
-| `riven-engine test-gen` | Generate Pest test stubs from manifest + docs |
-| `riven-engine --version` | Print the engine version |
-
-### AI Documentation
-
-By default, Riven generates docs from static analysis alone (always deterministic). Optionally enable AI to fill in descriptions and examples:
+## Use it
 
 ```bash
-# Free & private — local Ollama
-riven-engine docs --ai=ollama
-
-# Anthropic Claude
-ANTHROPIC_API_KEY=sk-... riven-engine docs --ai=anthropic
+php artisan serve                     # your app
+vendor/bin/riven-engine serve         # the dashboard on http://127.0.0.1:7600
 ```
 
-AI results are cached by a hash of the route's source, so re-runs with no code changes make zero API calls.
+`serve` runs `riven:export` for you whenever your routes or controllers change. On each endpoint:
 
-### Stress Testing
+- **Docs & Try it**: body fields and rules, responses, and a request panel. **Generate test data** fills the body with values that pass your rules, using real rows for `exists:` and new values for `unique:`.
+- **Stress test**: pick users and a duration, watch latency and errors live, and fail the run when p95 goes over a limit. Every run is saved to History.
 
-```bash
-# 50 concurrent workers, 30 seconds
-riven-engine stress --concurrency 50 --duration 30s
+![Stress test results for GET /api/users: 122 req/s, p95 36 ms, 0% errors, latency over time](docs/images/dashboard-stress.png)
 
-# Target specific routes
-riven-engine stress --route "GET /api/users" --route "POST /api/users"
+> Stress tests on POST, PUT and DELETE routes write to your database. Point them at a local or throwaway database.
 
-# With authentication
-riven-engine stress --auth-header "Bearer $TOKEN"
-```
+## Commands
 
-Reports include p50/p95/p99 latency, RPS, error rates, and status code histograms. Results export as JSON for the dashboard.
+| Command | What it does |
+|---|---|
+| `php artisan riven:scan` | Print the route table |
+| `php artisan riven:export` | Write `riven.json` |
+| `php artisan riven:fake-body "POST /api/users"` | Print request bodies that pass the route's rules |
+| `php artisan riven:install-engine` | Download and verify `riven-engine` |
+| `riven-engine serve` | Open the dashboard (`--base-url`, `--watch=false`) |
+| `riven-engine docs -o openapi.json` | Write an OpenAPI 3.1 document |
+| `riven-engine stress -d 30s -c 20 --save` | Load test GET routes from the terminal (`--route`, `--param`, `--token`) |
+| `riven-engine routes` | Print the route table from `riven.json` |
 
----
+## Configuration
 
-## Installation — Engine Binary
-
-The Go engine binary is downloaded automatically via Composer's `post-install` hook. The binary matches your platform and is verified with a SHA-256 checksum.
-
-To install manually:
-
-```bash
-# macOS (Apple Silicon)
-curl -fsSL https://github.com/faysal/riven/releases/latest/download/riven-engine-darwin-arm64.tar.gz | tar xz
-
-# Linux (x86_64)
-curl -fsSL https://github.com/faysal/riven/releases/latest/download/riven-engine-linux-amd64.tar.gz | tar xz
-
-# Move to PATH
-mv riven-engine /usr/local/bin/
-```
-
----
+`php artisan vendor:publish --tag=riven-config` creates `config/riven.php`, where you can `include` or `exclude` routes by URI pattern (`api/*`) and change where `riven.json` is written.
 
 ## Requirements
 
-- **PHP** ≥ 8.2
-- **Laravel** 11, 12, or 13
-- **Go** 1.22+ (only if building the engine from source)
-
----
+PHP 8.2+ and Laravel 11, 12 or 13. Prebuilt engine binaries cover Linux, macOS and Windows on amd64 and arm64.
 
 ## Development
 
 ```bash
-# Clone the repo
-git clone https://github.com/faysal/riven.git
-cd riven
-
-# PHP — install deps & run tests
-composer install
-vendor/bin/pest
-
-# Go engine — build & test
-cd engine
-go build ./cmd/riven-engine
-go test ./...
+composer install && vendor/bin/pest              # PHP package
+cd engine/web && npm ci && npm run build         # dashboard (embedded in the binary)
+cd .. && go test ./... && go build ./cmd/riven-engine
 ```
 
-The repo uses `.gitattributes` to keep Packagist dist archives PHP-only — the engine source, tests, and dev files are excluded. End users get the prebuilt binary via Composer's post-install hook.
-
----
+The manifest format is defined in [`schema/riven.schema.json`](schema/riven.schema.json).
 
 ## License
 
-Riven is open-source software licensed under the [MIT License](LICENSE).
+MIT. See [LICENSE](LICENSE).

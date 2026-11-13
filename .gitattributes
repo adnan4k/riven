@@ -2,6 +2,7 @@
 # prebuilt binaries (M6), so its source, tests and dev files stay out.
 /engine          export-ignore
 /tests           export-ignore
+/docs            export-ignore
 /.claude         export-ignore
 /.vscode         export-ignore
 /phpunit.xml     export-ignore
