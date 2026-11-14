@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { TriangleAlert } from 'lucide-react'
 import type { Manifest, OpenAPIDoc, ReportSummary } from '@/types'
 import { Link, navigate, routePath } from '@/router'
-import { short } from '@/format'
 import { displayUri, mainMethod, operation } from '@/lib/routes'
 import { MethodTag } from '@/components/Method'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -45,13 +44,6 @@ export function Endpoint({ manifest, id, tab, openapi, baseUrl, reports, onRunSa
     try { sessionStorage.setItem('riven:token', t) } catch { /* storage may be blocked */ }
   }
 
-  const chips = [
-    route.action.type === 'closure' ? 'Closure' : `${short(route.action.class)}@${route.action.method}`,
-    ...route.middleware,
-    ...(route.request.form_request ? [short(route.request.form_request)] : []),
-    ...(route.response.resource ? [short(route.response.resource) + (route.response.collection ? '[]' : '')] : []),
-  ]
-
   return (
     <article className="flex flex-col gap-6">
       <header className="flex flex-col gap-3">
@@ -62,9 +54,6 @@ export function Endpoint({ manifest, id, tab, openapi, baseUrl, reports, onRunSa
           {route.methods.filter((m) => m !== 'HEAD' && m !== mainMethod(route)).map((m) => (
             <Badge key={m} variant="outline" className="font-mono">also {m}</Badge>
           ))}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {chips.map((c) => <Badge key={c} variant="secondary" className="h-6 rounded-full px-3 font-mono font-normal">{c}</Badge>)}
         </div>
       </header>
 
