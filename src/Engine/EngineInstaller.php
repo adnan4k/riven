@@ -2,12 +2,12 @@
 
 namespace Riven\Engine;
 
+use Closure;
 use Composer\InstalledVersions;
-use Illuminate\Http\Client\Response;
-use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Process;
+use FilesystemIterator;
 use PharData;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use Throwable;
 
 /**
@@ -17,6 +17,9 @@ use Throwable;
  *
  * Archive names follow .goreleaser.yaml:
  *   riven-engine_<version>_<os>_<arch>.tar.gz (.zip on Windows)
+ *
+ * Plain PHP on purpose (no Laravel facades): the Composer plugin runs it
+ * inside Composer's process, where no Laravel app exists.
  */
 class EngineInstaller
 {
@@ -24,14 +27,20 @@ class EngineInstaller
 
     public const RELEASES_URL = 'https://github.com/adnan4k/riven/releases/download';
 
+    /**
+     * @param  ?Closure(string): ?string  $versionProbe  runs `<binary> --version`, returns its output (null on failure)
+     */
     public function __construct(
         private string $target,
+        private HttpClient $http,
         private string $releasesUrl = self::RELEASES_URL,
         private ?string $os = null,
         private ?string $arch = null,
+        private ?Closure $versionProbe = null,
     ) {
         $this->os ??= self::detectOs();
         $this->arch ??= self::detectArch();
+        $this->versionProbe ??= self::runVersion(...);
     }
 
     /**
@@ -56,7 +65,7 @@ class EngineInstaller
         $archive = $this->archiveName($version);
         $base = rtrim($this->releasesUrl, '/')."/v{$version}";
         $tmp = sys_get_temp_dir().'/riven-engine-'.bin2hex(random_bytes(6));
-        File::ensureDirectoryExists($tmp);
+        self::ensureDirectory($tmp);
 
         try {
             $archivePath = "{$tmp}/{$archive}";
@@ -64,16 +73,16 @@ class EngineInstaller
             $this->verify($archivePath, $archive, $this->fetch("{$base}/checksums.txt"));
             $binary = $this->extract($archivePath, "{$tmp}/extracted");
 
-            File::ensureDirectoryExists(dirname($this->target));
-            chmod($binary, 0755);
+            self::ensureDirectory(dirname($this->target));
             // Copy next to the target, then rename: replacing the binary is
             // atomic, so a failure never leaves a half-written engine behind.
             $staging = $this->target.'.download';
-            File::copy($binary, $staging);
-            chmod($staging, 0755);
-            File::move($staging, $this->target);
+            if (! @copy($binary, $staging) || ! chmod($staging, 0755) || ! @rename($staging, $this->target)) {
+                @unlink($staging);
+                throw new EngineInstallException("Couldn't write {$this->target}. Is that directory writable by you?");
+            }
         } finally {
-            File::deleteDirectory($tmp);
+            self::deleteDirectory($tmp);
         }
 
         return InstallResult::installed($version, $this->target);
@@ -100,9 +109,9 @@ class EngineInstaller
             return null;
         }
 
-        $result = Process::run([$this->target, '--version']);
+        $output = ($this->versionProbe)($this->target);
 
-        return $result->successful() && preg_match('/version v?(\S+)/', $result->output(), $m) ? $m[1] : null;
+        return $output !== null && preg_match('/version v?(\S+)/', $output, $m) ? $m[1] : null;
     }
 
     public static function installedVersion(): ?string
@@ -133,36 +142,32 @@ class EngineInstaller
 
     private function download(string $url, string $path): void
     {
-        $response = $this->get($url);
+        $response = $this->http->get($url);
 
-        if ($response->status() === 404) {
-            throw new EngineInstallException("No release file at {$url}. Is that version released for {$this->os}/{$this->arch}?");
+        if ($response->status === 404) {
+            throw new EngineInstallException(
+                "No release file at {$url}. Either that version has no {$this->os}/{$this->arch} build, "
+                .'or its GitHub release is still a draft (see '.preg_replace('#/download$#', '', rtrim($this->releasesUrl, '/')).').'
+            );
         }
         if (! $response->successful()) {
-            throw new EngineInstallException("Downloading {$url} failed with HTTP {$response->status()}.");
+            throw new EngineInstallException("Downloading {$url} failed with HTTP {$response->status}.");
         }
 
-        File::put($path, $response->body());
+        if (file_put_contents($path, $response->body) === false) {
+            throw new EngineInstallException("Couldn't save the download to {$path}.");
+        }
     }
 
     private function fetch(string $url): string
     {
-        $response = $this->get($url);
+        $response = $this->http->get($url);
 
         if (! $response->successful()) {
-            throw new EngineInstallException("Downloading {$url} failed with HTTP {$response->status()}.");
+            throw new EngineInstallException("Downloading {$url} failed with HTTP {$response->status}.");
         }
 
-        return $response->body();
-    }
-
-    private function get(string $url): Response
-    {
-        try {
-            return Http::timeout(120)->withUserAgent('riven-installer')->get($url);
-        } catch (Throwable $e) {
-            throw new EngineInstallException("Couldn't reach {$url}: {$e->getMessage()}", previous: $e);
-        }
+        return $response->body;
     }
 
     /**
@@ -202,5 +207,42 @@ class EngineInstaller
         }
 
         return $binary;
+    }
+
+    private static function runVersion(string $binary): ?string
+    {
+        $process = @proc_open([$binary, '--version'], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        if (! is_resource($process)) {
+            return null;
+        }
+
+        $output = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        return proc_close($process) === 0 ? $output : null;
+    }
+
+    private static function ensureDirectory(string $dir): void
+    {
+        if (! is_dir($dir) && ! @mkdir($dir, 0755, true) && ! is_dir($dir)) {
+            throw new EngineInstallException("Couldn't create {$dir}. Is it writable by you?");
+        }
+    }
+
+    private static function deleteDirectory(string $dir): void
+    {
+        if (! is_dir($dir)) {
+            return;
+        }
+
+        $items = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST,
+        );
+        foreach ($items as $item) {
+            $item->isDir() && ! $item->isLink() ? @rmdir($item->getPathname()) : @unlink($item->getPathname());
+        }
+        @rmdir($dir);
     }
 }

@@ -24,18 +24,9 @@ Riven reads your routes, FormRequest rules and API Resources, then gives you a l
 composer require faysal/riven --dev
 ```
 
-Download the engine binary for your platform after every Composer install, by adding one line to your app's `composer.json`:
+That's the only setup step. Riven is a Composer plugin: when Composer installs or updates it, it also downloads the `riven-engine` binary for your platform. The first time, Composer asks whether you trust `faysal/riven` to run code; answer `y` (it saves that under `allow-plugins` in your `composer.json`).
 
-```json
-"scripts": {
-    "post-autoload-dump": [
-        "...",
-        "@php artisan riven:install-engine --ansi"
-    ]
-}
-```
-
-The binary comes from this repository's GitHub release for your installed version and is checked against its SHA-256 checksum before it's installed to `vendor/bin/riven-engine`.
+The binary comes from this repository's GitHub release for your installed version and is checked against its SHA-256 checksum before it's installed to `vendor/bin/riven-engine`. If the download fails (offline, a platform without a build), Composer still finishes and prints a warning; run `php artisan riven:install-engine` to retry.
 
 ## Use it
 
@@ -60,7 +51,7 @@ vendor/bin/riven-engine serve         # the dashboard on http://127.0.0.1:7600
 | `php artisan riven:scan` | Print the route table |
 | `php artisan riven:export` | Write `riven.json` |
 | `php artisan riven:fake-body "POST /api/users"` | Print request bodies that pass the route's rules |
-| `php artisan riven:install-engine` | Download and verify `riven-engine` |
+| `php artisan riven:install-engine` | Download and verify `riven-engine` again (Composer does this for you) |
 | `riven-engine serve` | Open the dashboard (`--base-url`, `--watch=false`) |
 | `riven-engine docs -o openapi.json` | Write an OpenAPI 3.1 document |
 | `riven-engine stress -d 30s -c 20 --save` | Load test GET routes from the terminal (`--route`, `--param`, `--token`) |

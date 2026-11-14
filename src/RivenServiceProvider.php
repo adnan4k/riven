@@ -9,6 +9,7 @@ use Riven\Commands\FakeBodyCommand;
 use Riven\Commands\InstallEngineCommand;
 use Riven\Commands\ScanRoutesCommand;
 use Riven\Engine\EngineInstaller;
+use Riven\Engine\LaravelHttpClient;
 use Riven\Faking\BodyFaker;
 use Riven\Scanner\ActionReflector;
 use Riven\Scanner\ResourceDetector;
@@ -48,6 +49,7 @@ class RivenServiceProvider extends ServiceProvider
 
         $this->app->bind(EngineInstaller::class, fn ($app) => new EngineInstaller(
             target: $app['config']['riven.engine.path'] ?? $app->basePath('vendor/bin/riven-engine'.(PHP_OS_FAMILY === 'Windows' ? '.exe' : '')),
+            http: new LaravelHttpClient,
             releasesUrl: $app['config']['riven.engine.releases_url'] ?? EngineInstaller::RELEASES_URL,
         ));
     }

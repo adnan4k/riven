@@ -2,35 +2,9 @@
 
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Process;
 use Riven\Engine\EngineInstaller;
 use Riven\Engine\EngineInstallException;
-
-const RELEASES = 'https://releases.test/download';
-
-/**
- * Builds a release archive the way GoReleaser does, with a fake binary inside.
- * Returns [file name, bytes].
- */
-function fakeArchive(string $dir, string $os, string $arch, string $version = '0.1.0'): array
-{
-    $binary = $os === 'windows' ? 'riven-engine.exe' : 'riven-engine';
-    $base = "{$dir}/riven-engine_{$version}_{$os}_{$arch}";
-
-    if ($os === 'windows') {
-        $zip = new PharData("{$base}.zip", 0, null, Phar::ZIP);
-        $zip->addFromString($binary, "fake engine {$version}");
-        $path = "{$base}.zip";
-    } else {
-        $tar = new PharData("{$base}.tar");
-        $tar->addFromString($binary, "fake engine {$version}");
-        $tar->addFromString('README.md', 'readme');
-        $tar->compress(Phar::GZ);
-        $path = "{$base}.tar.gz";
-    }
-
-    return [basename($path), file_get_contents($path)];
-}
+use Riven\Engine\LaravelHttpClient;
 
 /** Fakes a GitHub release for v0.1.0 with the given archive and checksums. */
 function fakeRelease(string $name, string $bytes, ?string $checksums = null): void
@@ -44,17 +18,23 @@ function fakeRelease(string $name, string $bytes, ?string $checksums = null): vo
     ]);
 }
 
+/** An installer that downloads through Laravel's Http (faked) and reports $engineVersion as installed. */
+function installer(string $target, string $os = 'linux', string $arch = 'amd64', ?string $engineVersion = null): EngineInstaller
+{
+    return new EngineInstaller($target, new LaravelHttpClient, RELEASES, $os, $arch,
+        fn () => $engineVersion === null ? null : "riven-engine version {$engineVersion}\n");
+}
+
 beforeEach(function () {
     $this->dir = sys_get_temp_dir().'/riven-install-'.uniqid();
     File::ensureDirectoryExists($this->dir);
     $this->target = "{$this->dir}/bin/riven-engine";
-    Process::fake(['*' => Process::result('', 'not found', 127)]);
 });
 
 afterEach(fn () => File::deleteDirectory($this->dir));
 
 it('maps the platform to the GoReleaser archive name', function (string $os, string $arch, string $name) {
-    expect((new EngineInstaller('x', RELEASES, $os, $arch))->archiveName('0.1.0'))->toBe($name);
+    expect(installer('x', $os, $arch)->archiveName('0.1.0'))->toBe($name);
 })->with([
     ['linux', 'amd64', 'riven-engine_0.1.0_linux_amd64.tar.gz'],
     ['darwin', 'arm64', 'riven-engine_0.1.0_darwin_arm64.tar.gz'],
@@ -73,7 +53,7 @@ it('downloads, verifies and installs the binary', function () {
     [$name, $bytes] = fakeArchive($this->dir, 'linux', 'amd64');
     fakeRelease($name, $bytes);
 
-    $result = (new EngineInstaller($this->target, RELEASES, 'linux', 'amd64'))->install('v0.1.0');
+    $result = installer($this->target)->install('v0.1.0');
 
     expect($result->installed)->toBeTrue()
         ->and($result->version)->toBe('0.1.0')
@@ -88,7 +68,7 @@ it('installs from a Windows zip', function () {
     fakeRelease($name, $bytes);
     $target = "{$this->dir}/bin/riven-engine.exe";
 
-    (new EngineInstaller($target, RELEASES, 'windows', 'amd64'))->install('0.1.0');
+    installer($target, 'windows')->install('0.1.0');
 
     expect(file_get_contents($target))->toBe('fake engine 0.1.0');
 });
@@ -97,7 +77,7 @@ it('refuses a binary whose checksum does not match', function () {
     [$name, $bytes] = fakeArchive($this->dir, 'linux', 'amd64');
     fakeRelease($name, $bytes, str_repeat('a', 64)."  {$name}\n");
 
-    expect(fn () => (new EngineInstaller($this->target, RELEASES, 'linux', 'amd64'))->install('0.1.0'))
+    expect(fn () => installer($this->target)->install('0.1.0'))
         ->toThrow(EngineInstallException::class, 'Checksum mismatch');
     expect(File::exists($this->target))->toBeFalse();
 });
@@ -106,7 +86,7 @@ it('refuses a binary missing from checksums.txt', function () {
     [$name, $bytes] = fakeArchive($this->dir, 'linux', 'amd64');
     fakeRelease($name, $bytes, str_repeat('a', 64)."  something-else.tar.gz\n");
 
-    expect(fn () => (new EngineInstaller($this->target, RELEASES, 'linux', 'amd64'))->install('0.1.0'))
+    expect(fn () => installer($this->target)->install('0.1.0'))
         ->toThrow(EngineInstallException::class, 'no entry for');
     expect(File::exists($this->target))->toBeFalse();
 });
@@ -116,7 +96,7 @@ it('keeps the old binary when a download fails', function () {
     File::put($this->target, 'old engine');
     Http::fake(['*' => Http::response('not found', 404)]);
 
-    expect(fn () => (new EngineInstaller($this->target, RELEASES, 'linux', 'amd64'))->install('0.1.0'))
+    expect(fn () => installer($this->target)->install('0.1.0'))
         ->toThrow(EngineInstallException::class, 'No release file at '.RELEASES.'/v0.1.0/riven-engine_0.1.0_linux_amd64.tar.gz');
     expect(file_get_contents($this->target))->toBe('old engine');
 });
@@ -124,7 +104,7 @@ it('keeps the old binary when a download fails', function () {
 it('skips dev versions, which have no release', function () {
     Http::fake();
 
-    $result = (new EngineInstaller($this->target, RELEASES, 'linux', 'amd64'))->install('dev-main');
+    $result = installer($this->target)->install('dev-main');
 
     expect($result->installed)->toBeFalse()
         ->and($result->message)->toContain('dev-main')->toContain('go build');
@@ -134,10 +114,9 @@ it('skips dev versions, which have no release', function () {
 it('skips when the same version is already installed, unless forced', function () {
     File::ensureDirectoryExists(dirname($this->target));
     File::put($this->target, 'current');
-    Process::fake(['*' => Process::result("riven-engine version 0.1.0\n")]);
     [$name, $bytes] = fakeArchive($this->dir, 'linux', 'amd64');
     fakeRelease($name, $bytes);
-    $installer = new EngineInstaller($this->target, RELEASES, 'linux', 'amd64');
+    $installer = installer($this->target, engineVersion: '0.1.0');
 
     expect($installer->install('0.1.0')->installed)->toBeFalse();
     Http::assertNothingSent();
@@ -149,11 +128,10 @@ it('skips when the same version is already installed, unless forced', function (
 it('upgrades when a different version is installed', function () {
     File::ensureDirectoryExists(dirname($this->target));
     File::put($this->target, 'older');
-    Process::fake(['*' => Process::result("riven-engine version 0.0.9\n")]);
     [$name, $bytes] = fakeArchive($this->dir, 'linux', 'amd64');
     fakeRelease($name, $bytes);
 
-    expect((new EngineInstaller($this->target, RELEASES, 'linux', 'amd64'))->install('0.1.0')->installed)->toBeTrue();
+    expect(installer($this->target, engineVersion: '0.0.9')->install('0.1.0')->installed)->toBeTrue();
 });
 
 it('runs from artisan with the configured path and mirror', function () {
