@@ -11,11 +11,15 @@ async function parse<T>(res: Response, path: string): Promise<T> {
   return body as T
 }
 
-export const getJSON = <T,>(path: string) => fetch(path).then((r) => parse<T>(r, path))
+// API paths are written as "/api/x" but resolved against <base href>, so they
+// reach /api/x under riven-engine serve and /riven/api/x inside Laravel.
+export const apiURL = (path: string) => new URL(path.replace(/^\//, ''), document.baseURI).toString()
+
+export const getJSON = <T,>(path: string) => fetch(apiURL(path)).then((r) => parse<T>(r, path))
 
 // postJSON always sends JSON: the server refuses anything else (see server/actions.go guard).
 export const postJSON = <T,>(path: string, body: unknown) =>
-  fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  fetch(apiURL(path), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     .then((r) => parse<T>(r, path))
 
 // useJSON fetches an API path; changing `path` or `version` refetches.

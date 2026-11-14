@@ -30,12 +30,15 @@ The binary comes from this repository's GitHub release for your installed versio
 
 ## Use it
 
-```bash
-php artisan serve                     # your app
-vendor/bin/riven-engine serve         # the dashboard on http://127.0.0.1:7600
-```
+Open **`APP_URL/riven`** (for example http://localhost:8000/riven) while your app runs. Nothing else to start: your app serves the dashboard and reads your routes live on every page load. It's only there when `APP_ENV=local`; set `RIVEN_DASHBOARD=true` or `false` to override, and `RIVEN_PATH` to mount it elsewhere.
 
-`serve` runs `riven:export` for you whenever your routes or controllers change. On each endpoint:
+**Target** in the top bar is where requests go. It starts as `APP_URL`; click it to send requests elsewhere (another port, a staging URL, a Docker service name like `http://nginx`). The choice stays in your browser, and the reset arrow goes back to `APP_URL`. When the target is the dashboard's own address, your browser sends Try it requests itself, with your session cookie and XSRF token, so `web` routes work while you're logged in.
+
+> On `php artisan serve` with another target on the same app, start it with several workers, or the app can't answer a request while it's busy with another: `PHP_CLI_SERVER_WORKERS=4 php artisan serve --no-reload`.
+
+Prefer a standalone dashboard (CI box, no app running)? `vendor/bin/riven-engine serve` serves it on http://127.0.0.1:7600 from `riven.json` and re-runs `riven:export` whenever your routes or controllers change.
+
+On each endpoint:
 
 - **Docs & Try it**: body fields and rules, responses, and a request panel. **Generate test data** fills the body with values that pass your rules, using real rows for `exists:` and new values for `unique:`.
 - **Stress test**: pick users and a duration, watch latency and errors live, and fail the run when p95 goes over a limit. Every run is saved to History.

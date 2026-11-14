@@ -59,4 +59,29 @@ return [
         'releases_url' => 'https://github.com/adnan4k/riven/releases/download',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Dashboard
+    |--------------------------------------------------------------------------
+    |
+    | The dashboard is served by your app at APP_URL/<path> (default /riven),
+    | so there is nothing else to start. It shows your routes' internals and
+    | can send load to any URL, so it's only on in the "local" environment.
+    |
+    | enabled: null = only when APP_ENV=local; true/false to force it.
+    | path: where it's mounted.
+    | middleware: added in front of it, e.g. ['web', 'auth'] to require login.
+    | storage: where stress runs keep their live state (and the UI files).
+    | reports: stress reports, shared with `riven-engine serve`.
+    |
+    */
+
+    'dashboard' => [
+        'enabled' => env('RIVEN_DASHBOARD'),
+        'path' => env('RIVEN_PATH', 'riven'),
+        'middleware' => [],
+        'storage' => null, // null = storage/framework/riven
+        'reports' => 'riven-reports',
+    ],
+
 ];

@@ -72,6 +72,20 @@ func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 	return true
 }
 
+// targetURL is the dashboard's chosen target (a request's base_url), else
+// --base-url, else the manifest's app.url. A chosen target must be an
+// absolute http(s) URL: the guard already limits who can choose one.
+func (s *srv) targetURL(chosen string, m *manifest.Manifest) (string, error) {
+	if chosen == "" {
+		return s.baseURL(m), nil
+	}
+	u, err := url.Parse(chosen)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return "", fmt.Errorf("target %q must be an absolute http:// or https:// URL", chosen)
+	}
+	return chosen, nil
+}
+
 // baseURL is --base-url, else the manifest's app.url.
 func (s *srv) baseURL(m *manifest.Manifest) string {
 	if s.cfg.BaseURL != "" {
@@ -99,8 +113,9 @@ func (s *srv) config(w http.ResponseWriter, r *http.Request) {
 // --- Try it -----------------------------------------------------------------
 
 type tryRequest struct {
+	BaseURL string            `json:"base_url"` // target chosen in the dashboard; default: the app's base URL
 	Method  string            `json:"method"`
-	Path    string            `json:"path"` // "/api/users/1?x=y", always on the app's base URL
+	Path    string            `json:"path"` // "/api/users/1?x=y", appended to the target
 	Headers map[string]string `json:"headers"`
 	Body    string            `json:"body"`
 }
@@ -116,8 +131,8 @@ type tryResponse struct {
 
 const tryBodyLimit = 1 << 20
 
-// POST /api/try sends one request to the app. The browser can't call the app
-// directly (CORS), so the engine does it, but only on the app's own base URL.
+// POST /api/try sends one request to the target. The browser can't call
+// another origin directly (CORS), so the engine does it.
 func (s *srv) try(w http.ResponseWriter, r *http.Request) {
 	var req tryRequest
 	if !decode(w, r, &req) {
@@ -139,7 +154,12 @@ func (s *srv) try(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "path must start with a single /")
 		return
 	}
-	base := strings.TrimSuffix(s.baseURL(m), "/")
+	base, err := s.targetURL(req.BaseURL, m)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	base = strings.TrimSuffix(base, "/")
 	if base == "" {
 		writeError(w, http.StatusBadRequest, "no base URL: start serve with --base-url")
 		return
@@ -196,7 +216,8 @@ func (s *srv) try(w http.ResponseWriter, r *http.Request) {
 // --- Stress runs from the dashboard -------------------------------------------
 
 type stressRequest struct {
-	Routes      []string          `json:"routes"` // route ids (ids never contain *, so each matches only itself)
+	BaseURL     string            `json:"base_url"` // target chosen in the dashboard; default: --base-url, else app.url
+	Routes      []string          `json:"routes"`   // route ids (ids never contain *, so each matches only itself)
 	Params      map[string]string `json:"params"`
 	Token       string            `json:"token"`
 	Concurrency int               `json:"concurrency"`
@@ -259,7 +280,15 @@ func (s *srv) startStress(w http.ResponseWriter, r *http.Request) {
 	if req.Token != "" {
 		header.Set("Authorization", "Bearer "+req.Token)
 	}
-	plan, err := targets.Build(m, targets.Options{BaseURL: s.cfg.BaseURL, Routes: req.Routes, Params: req.Params, Header: header})
+	base := s.cfg.BaseURL
+	if req.BaseURL != "" {
+		var err error
+		if base, err = s.targetURL(req.BaseURL, m); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+	plan, err := targets.Build(m, targets.Options{BaseURL: base, Routes: req.Routes, Params: req.Params, Header: header})
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -373,23 +402,50 @@ func (s *srv) snapshot(run *run) StressState {
 
 	run.mu.Lock()
 	defer run.mu.Unlock()
+	return NewStressState(LiveRun{
+		ID: run.ID, EngineVersion: s.cfg.Version, Manifest: run.Manifest, BaseURL: run.BaseURL,
+		Config: run.Config, Targets: run.Targets, Started: run.Started, Finished: run.finished,
+		Done: run.done, Interrupted: run.interrupted, Report: run.report, Err: run.err,
+	}, results)
+}
+
+// LiveRun is what NewStressState needs to know about a run.
+type LiveRun struct {
+	ID            string
+	EngineVersion string
+	Manifest      *manifest.Manifest
+	BaseURL       string
+	Config        stress.Config
+	Targets       []stress.Target
+	Started       time.Time
+	Finished      time.Time // when Done
+	Done          bool
+	Interrupted   bool
+	Report        string // saved report file name, once saved
+	Err           string
+}
+
+// NewStressState builds the live view of a run from its results so far.
+// GET /api/stress serves it; `stress --live-file` writes it for the Laravel
+// dashboard to poll.
+func NewStressState(run LiveRun, results []stress.Result) StressState {
 	end := time.Now()
 	state := "running"
-	if run.done {
-		end, state = run.finished, "done"
-		if run.err != "" && run.report == "" {
+	if run.Done {
+		end, state = run.Finished, "done"
+		if run.Err != "" && run.Report == "" {
 			state = "failed"
 		}
 	}
 	live := report.NewStress(report.Run{
-		EngineVersion: s.cfg.Version, Manifest: run.Manifest, BaseURL: run.BaseURL, Config: run.Config,
-		StartedAt: run.Started, FinishedAt: end, Interrupted: run.interrupted,
+		EngineVersion: run.EngineVersion, Manifest: run.Manifest, BaseURL: run.BaseURL, Config: run.Config,
+		StartedAt: run.Started, FinishedAt: end, Interrupted: run.Interrupted,
 		Summary: stress.Summarize(run.Targets, results), Timeline: stress.Timeline(results, run.Started),
 	})
 	return StressState{
 		State: state, ID: run.ID,
-		ElapsedMs: float64(end.Sub(run.Started).Milliseconds()), DurationMs: float64(run.Duration.Milliseconds()),
-		Interrupted: run.interrupted, Report: run.report, Error: run.err, Live: &live,
+		ElapsedMs: float64(end.Sub(run.Started).Milliseconds()), DurationMs: float64(run.Config.Duration.Milliseconds()),
+		Interrupted: run.Interrupted, Report: run.Report, Error: run.Err, Live: &live,
 	}
 }
 

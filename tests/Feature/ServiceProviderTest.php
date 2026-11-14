@@ -11,3 +11,9 @@ it('registers RouteScanner as a singleton', function () {
 it('registers the riven:scan command', function () {
     $this->artisan('riven:scan')->assertSuccessful();
 });
+
+it('keeps the dashboard off outside the local environment', function () {
+    expect(app()->environment())->toBe('testing');
+
+    $this->get('/riven')->assertNotFound();
+});

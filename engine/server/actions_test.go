@@ -247,3 +247,40 @@ func TestConfigReportsBaseURL(t *testing.T) {
 		t.Errorf("default base URL should be the manifest's app.url: %s", body)
 	}
 }
+
+func TestTryUsesTheTargetChosenInTheDashboard(t *testing.T) {
+	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("other " + r.URL.Path))
+	}))
+	defer other.Close()
+	h, _ := newWithApp(t, "http://127.0.0.1:1")
+
+	code, body := post(t, h, "/api/try", `{"base_url": "`+other.URL+`/", "method": "GET", "path": "/ping"}`)
+
+	if code != 200 || !strings.Contains(body, `"body":"other /ping"`) {
+		t.Errorf("try = %d %s", code, body)
+	}
+}
+
+func TestTryRefusesATargetThatIsNotAnHTTPURL(t *testing.T) {
+	h, _ := newWithApp(t, "http://127.0.0.1:1")
+
+	for _, target := range []string{"file:///etc/passwd", "localhost:8080", "ftp://x"} {
+		if code, _ := post(t, h, "/api/try", `{"base_url": "`+target+`", "method": "GET", "path": "/"}`); code != http.StatusBadRequest {
+			t.Errorf("target %q: status %d, want 400", target, code)
+		}
+	}
+}
+
+func TestStressUsesTheTargetChosenInTheDashboard(t *testing.T) {
+	chosen, hits := app(t, 0)
+	h, _ := newWithApp(t, "http://127.0.0.1:1")
+
+	code, body := post(t, h, "/api/stress", `{"base_url": "`+chosen.URL+`", "routes": ["GET /api/users"], "concurrency": 1, "requests": 3}`)
+	if code != 200 {
+		t.Fatalf("start = %d %s", code, body)
+	}
+	if st := waitDone(t, h); st.State != "done" || st.Live.Config.BaseURL != chosen.URL || hits.Load() != 3 {
+		t.Errorf("state = %s, base = %s, hits = %d", st.State, st.Live.Config.BaseURL, hits.Load())
+	}
+}

@@ -139,7 +139,10 @@ function TryIt({ route, method, baseUrl, schema, params, setParams, token, setTo
   async function send() {
     setResult({ state: 'sending' })
     try {
-      const res = await postJSON<TryResponse>('/api/try', { method, path, headers, body: sendsBody ? body : '' })
+      const payload = sendsBody ? body : ''
+      const res = sameOrigin(baseUrl)
+        ? await sendDirect(method, baseUrl.replace(/\/$/, '') + path, headers, payload)
+        : await postJSON<TryResponse>('/api/try', { base_url: baseUrl, method, path, headers, body: payload })
       setResult({ state: 'ok', res })
     } catch (e) {
       setResult({ state: 'error', message: (e as Error).message })
@@ -246,6 +249,41 @@ function ResponseView({ res }: { res: TryResponse }) {
       {res.truncated && <p className="text-xs text-muted-foreground">Body cut at 1 MB.</p>}
     </div>
   )
+}
+
+// When the target is the page's own origin (the dashboard served by Laravel
+// at /riven), the browser sends the request itself: no proxy, so it works
+// even when the server can't reach its own public URL (Docker), and it
+// carries your session cookie plus Laravel's XSRF token, so web routes work
+// while you're logged in. Other targets go through the server (CORS).
+function sameOrigin(target: string): boolean {
+  try { return new URL(target).origin === window.location.origin } catch { return false }
+}
+
+const BODY_LIMIT = 1 << 20
+
+async function sendDirect(method: string, url: string, headers: Record<string, string>, body: string): Promise<TryResponse> {
+  const xsrf = document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='))
+  const h = { ...headers }
+  if (xsrf) h['X-XSRF-TOKEN'] = decodeURIComponent(xsrf.slice('XSRF-TOKEN='.length))
+
+  const start = performance.now()
+  const res = await fetch(url, { method, headers: h, body: body || undefined, credentials: 'same-origin', redirect: 'manual' })
+  const text = method === 'HEAD' ? '' : await res.text()
+  const duration = performance.now() - start
+
+  const out: Record<string, string> = {}
+  res.headers.forEach((v, k) => { out[k.replace(/(^|-)\w/g, (c) => c.toUpperCase())] = v })
+  const size = new TextEncoder().encode(text).length
+  return {
+    // A redirect is hidden from scripts (opaque); say so instead of "0".
+    status: res.type === 'opaqueredirect' ? 302 : res.status,
+    duration_ms: Math.round(duration * 10) / 10,
+    size_bytes: size,
+    headers: out,
+    body: res.type === 'opaqueredirect' ? '(redirect: the browser hides where to)' : text.slice(0, BODY_LIMIT),
+    truncated: text.length > BODY_LIMIT,
+  }
 }
 
 function jsonError(text: string): string | null {

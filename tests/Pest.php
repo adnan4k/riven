@@ -1,8 +1,10 @@
 <?php
 
+use Riven\Tests\DashboardTestCase;
 use Riven\Tests\TestCase;
 
 pest()->extend(TestCase::class)->in('Feature', 'Unit');
+pest()->extend(DashboardTestCase::class)->in('Dashboard');
 
 const RELEASES = 'https://releases.test/download';
 

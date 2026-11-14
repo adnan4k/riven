@@ -68,7 +68,8 @@ class RouteScanner
         $routes = collect($this->router->getRoutes()->getRoutes())
             ->reject(fn (Route $route) => ! $this->isIncludedUri($route)
                 || $this->isExcludedUri($route)
-                || $this->isVendorAction($route))
+                || $this->isVendorAction($route)
+                || $this->isRivenDashboard($route))
             ->map(fn (Route $route) => $this->describe($route))
             ->values()
             ->all();
@@ -236,6 +237,17 @@ class RouteScanner
     private function isExcludedUri(Route $route): bool
     {
         return $this->excludedUris !== [] && Str::is($this->excludedUris, $route->uri());
+    }
+
+    /**
+     * The dashboard's own routes (/riven/...). Checked by namespace because the
+     * vendor check misses a symlinked path repository.
+     */
+    private function isRivenDashboard(Route $route): bool
+    {
+        $controller = $route->getAction('controller');
+
+        return is_string($controller) && str_starts_with($controller, 'Riven\\Http\\');
     }
 
     private function isVendorAction(Route $route): bool

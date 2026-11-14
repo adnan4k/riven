@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"maps"
@@ -16,6 +17,7 @@ import (
 	"github.com/adnan4k/riven/engine/internal/table"
 	"github.com/adnan4k/riven/engine/manifest"
 	"github.com/adnan4k/riven/engine/report"
+	"github.com/adnan4k/riven/engine/server"
 	"github.com/adnan4k/riven/engine/stress"
 	"github.com/adnan4k/riven/engine/targets"
 	"github.com/spf13/cobra"
@@ -34,6 +36,10 @@ type stressFlags struct {
 	dryRun      bool
 	output      string
 	save        bool
+	// For the Laravel-hosted dashboard, which runs stress in the background:
+	liveFile   string // keep the live state (GET /api/stress shape) in this file
+	stopFile   string // stop (like Ctrl-C) as soon as this file exists
+	bodiesFile string // JSON {"<route id>": [body, ...]}: requests rotate through them
 }
 
 func newStressCommand() *cobra.Command {
@@ -68,6 +74,12 @@ them explicitly with --route. Routes with required parameters need --param.`,
 	fl.BoolVar(&f.dryRun, "dry-run", false, "list the requests that would be sent, send nothing")
 	fl.StringVarP(&f.output, "output", "o", "", "also write a JSON report to this file (for CI)")
 	fl.BoolVar(&f.save, "save", false, "also save the report to "+DefaultReportsDir+"/ for `riven-engine serve`")
+	fl.StringVar(&f.liveFile, "live-file", "", "keep the run's live state in this JSON file (for the Laravel dashboard)")
+	fl.StringVar(&f.stopFile, "stop-file", "", "stop the run once this file exists")
+	fl.StringVar(&f.bodiesFile, "bodies-file", "", `JSON object {"<route id>": [bodies]}; requests rotate through each route's bodies`)
+	for _, name := range []string{"live-file", "stop-file", "bodies-file"} {
+		fl.MarkHidden(name) // plumbing between the PHP dashboard and the engine
+	}
 
 	return cmd
 }
@@ -87,6 +99,11 @@ func runStress(cmd *cobra.Command, f stressFlags) error {
 	plan, err := targets.Build(m, opts)
 	if err != nil {
 		return err
+	}
+	if f.bodiesFile != "" {
+		if err := attachBodies(plan.Targets, f.bodiesFile); err != nil {
+			return err
+		}
 	}
 
 	out, errOut := cmd.OutOrStdout(), cmd.ErrOrStderr()
@@ -114,9 +131,22 @@ func runStress(cmd *cobra.Command, f stressFlags) error {
 	defer stop()
 
 	started := time.Now()
+	var live *liveWriter
+	if f.liveFile != "" {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithCancel(ctx)
+		defer cancel()
+		live = startLive(f.liveFile, f.stopFile, cancel, server.LiveRun{
+			ID: strconv.FormatInt(started.UnixNano(), 10), EngineVersion: Version, Manifest: m,
+			BaseURL: plan.BaseURL, Config: cfg, Targets: plan.Targets, Started: started,
+		})
+		cfg.Recorder = live.rec
+		defer live.stop()
+	}
 	results, err := stress.Run(ctx, stress.NewClient(cfg), cfg, plan.Targets)
 	finished := time.Now()
 	if err != nil && ctx.Err() == nil {
+		live.finish(finished, false, "", err.Error())
 		return err
 	}
 	interrupted := ctx.Err() != nil
@@ -149,10 +179,12 @@ func runStress(cmd *cobra.Command, f stressFlags) error {
 			Timeline:      stress.Timeline(results, started),
 		})
 		if err := report.Write(output, rep); err != nil {
+			live.finish(finished, interrupted, "", "run finished but the report couldn't be saved: "+err.Error())
 			return err
 		}
 		fmt.Fprintf(out, "Wrote %s\n", output)
 	}
+	live.finish(finished, interrupted, filepath.Base(output), "")
 	return nil
 }
 

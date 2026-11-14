@@ -1,0 +1,37 @@
+#!/usr/bin/env php
+<?php
+// Stands in for riven-engine in the dashboard tests: same commands and
+// flags the PHP side uses, canned output.
+
+$args = array_slice($argv, 1);
+$flag = function (string $name) use ($args): ?string {
+    $i = array_search('--'.$name, $args, true);
+
+    return $i === false ? null : $args[$i + 1];
+};
+
+switch ($args[0] ?? '') {
+    case 'docs':
+        $manifest = json_decode(file_get_contents($flag('manifest')), true);
+        echo json_encode(['openapi' => '3.1.0', 'paths' => [], 'x-route-count' => count($manifest['routes'])]);
+        break;
+
+    case 'ui':
+        @mkdir($args[1].'/assets', 0755, true);
+        file_put_contents($args[1].'/index.html', '<html><head><base href="/" /></head><body>riven ui</body></html>');
+        file_put_contents($args[1].'/assets/app-abc.js', 'console.log(1)');
+        break;
+
+    case 'stress':
+        file_put_contents(dirname($flag('live-file')).'/args.json', json_encode($args));
+        $report = ['report_version' => 1, 'kind' => 'stress', 'started_at' => '2026-11-14T10:00:00Z', 'interrupted' => false,
+            'config' => ['base_url' => $flag('base-url')], 'summary' => ['requests' => 3], 'routes' => [['route_id' => 'x']], 'timeline' => []];
+        file_put_contents($flag('output'), json_encode($report));
+        file_put_contents($flag('live-file'), json_encode(['state' => 'done', 'id' => '1', 'elapsed_ms' => 5, 'duration_ms' => 0,
+            'interrupted' => false, 'report' => basename($flag('output')), 'live' => $report]));
+        break;
+
+    default:
+        fwrite(STDERR, "fake-engine: unknown command\n");
+        exit(1);
+}

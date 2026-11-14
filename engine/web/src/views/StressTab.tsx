@@ -24,8 +24,9 @@ const PRESETS = {
 } as const
 type Preset = keyof typeof PRESETS
 
-export function StressTab({ route, params, setParams, token, onRunSaved }: {
+export function StressTab({ route, baseUrl, params, setParams, token, onRunSaved }: {
   route: Route
+  baseUrl: string
   params: Record<string, string>
   setParams: (p: Record<string, string>) => void
   token: string
@@ -80,7 +81,7 @@ export function StressTab({ route, params, setParams, token, onRunSaved }: {
     setError(null)
     try {
       const s = await postJSON<StressState>('/api/stress', {
-        routes: [route.id], params, token, concurrency: Number(users), duration_s: Number(duration),
+        base_url: baseUrl, routes: [route.id], params, token, concurrency: Number(users), duration_s: Number(duration),
         fake_bodies: canGenerate ? Number(pool) || 0 : 0,
       })
       setState(s)

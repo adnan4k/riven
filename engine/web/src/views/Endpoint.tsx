@@ -77,7 +77,7 @@ export function Endpoint({ manifest, id, tab, openapi, baseUrl, reports, onRunSa
           <DocsTab route={route} op={op} baseUrl={baseUrl} params={params} setParams={setParams} token={token} setToken={updateToken} />
         </TabsContent>
         <TabsContent value="stress" className="pt-4">
-          <StressTab route={route} params={params} setParams={setParams} token={token} onRunSaved={onRunSaved} />
+          <StressTab route={route} baseUrl={baseUrl} params={params} setParams={setParams} token={token} onRunSaved={onRunSaved} />
         </TabsContent>
         <TabsContent value="history" className="pt-4">
           <HistoryTab route={route} reports={reports} />

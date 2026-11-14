@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Activity, RefreshCw, Search } from 'lucide-react'
-import { postJSON, useJSON } from '@/api'
+import { Activity, Pencil, RefreshCw, RotateCcw, Search } from 'lucide-react'
+import { apiURL, postJSON, useJSON } from '@/api'
 import { Link, routePath, usePath } from '@/router'
 import type { AppConfig, Manifest, OpenAPIDoc, ReportSummary, RouteStats, StressReport } from '@/types'
 import { ago } from '@/format'
@@ -12,6 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Overview } from '@/views/Overview'
 import { Endpoint } from '@/views/Endpoint'
@@ -30,7 +31,11 @@ export function App() {
 
   const [query, setQuery] = useState('')
   const [rescan, setRescan] = useState<{ busy: boolean; error?: string }>({ busy: false })
-  const scan = useLiveUpdates(() => setVersion((v) => v + 1))
+  // Wait for the config: inside Laravel there is no event stream to open.
+  const live = config.state === 'ok' && config.data.live_updates !== false
+  const scan = useLiveUpdates(() => setVersion((v) => v + 1), live)
+  const defaultTarget = config.state === 'ok' ? config.data.base_url : ''
+  const [target, setTarget] = useTarget(defaultTarget)
 
   const [, section, param, tab] = path.split('/')
   const selectedId = section === 'routes' && param ? decodeURIComponent(param) : null
@@ -41,7 +46,8 @@ export function App() {
     setRescan({ busy: true })
     try {
       await postJSON('/api/rescan', {})
-      setRescan({ busy: false }) // the "manifest" event triggers the reload
+      setRescan({ busy: false })
+      if (!live) setVersion((v) => v + 1) // with live updates, the "manifest" event reloads
     } catch (e) {
       setRescan({ busy: false, error: (e as Error).message })
     }
@@ -51,7 +57,9 @@ export function App() {
     <div className="flex h-dvh flex-col">
       <TopBar
         appName={manifest.state === 'ok' ? manifest.data.app.name : null}
-        baseUrl={config.state === 'ok' ? config.data.base_url : ''}
+        target={target}
+        defaultTarget={defaultTarget}
+        onTarget={setTarget}
         canRescan={config.state === 'ok' && config.data.can_rescan}
         rescanning={rescan.busy || scan.state === 'running'}
         scanNote={scan.state === 'done' ? 'Routes updated' : undefined}
@@ -89,7 +97,7 @@ export function App() {
                   id={selectedId}
                   tab={tab}
                   openapi={openapi.state === 'ok' ? openapi.data : null}
-                  baseUrl={config.state === 'ok' ? config.data.base_url : ''}
+                  baseUrl={target}
                   reports={reports.state === 'ok' ? reports.data : []}
                   onRunSaved={() => setVersion((v) => v + 1)}
                 />
@@ -108,15 +116,37 @@ export function App() {
   )
 }
 
+// useTarget is the URL Try it and stress runs are sent to. It starts as the
+// server's default (APP_URL) and can be changed in the top bar; the choice is
+// kept in this browser only, and clearing it goes back to the default.
+function useTarget(fallback: string): [string, (t: string) => void] {
+  const [chosen, setChosen] = useState(() => {
+    try { return localStorage.getItem('riven:target') ?? '' } catch { return '' }
+  })
+  const set = (t: string) => {
+    const value = t.trim().replace(/\/+$/, '')
+    setChosen(value)
+    try { value ? localStorage.setItem('riven:target', value) : localStorage.removeItem('riven:target') } catch { /* storage blocked */ }
+  }
+  return [chosen || fallback, set]
+}
+
 // useLiveUpdates listens to /api/events: the engine watches the app's code,
 // re-exports on change, and tells us to reload. EventSource reconnects by itself.
-function useLiveUpdates(onManifest: () => void) {
+// Without live updates (inside Laravel, the manifest is built on every
+// request) it reloads when you come back to the tab instead.
+function useLiveUpdates(onManifest: () => void, enabled: boolean) {
   const [scan, setScan] = useState<{ state: 'idle' | 'running' | 'done' | 'failed'; message?: string }>({ state: 'idle' })
   const reload = useRef(onManifest)
   reload.current = onManifest
 
   useEffect(() => {
-    const es = new EventSource('/api/events')
+    if (!enabled) {
+      const onVisible = () => document.visibilityState === 'visible' && reload.current()
+      document.addEventListener('visibilitychange', onVisible)
+      return () => document.removeEventListener('visibilitychange', onVisible)
+    }
+    const es = new EventSource(apiURL('/api/events'))
     let clear: ReturnType<typeof setTimeout>
     es.addEventListener('manifest', () => reload.current())
     es.addEventListener('scan', (msg) => {
@@ -126,14 +156,16 @@ function useLiveUpdates(onManifest: () => void) {
       if (e.state === 'done') clear = setTimeout(() => setScan({ state: 'idle' }), 2500)
     })
     return () => { clearTimeout(clear); es.close() }
-  }, [])
+  }, [enabled])
 
   return scan
 }
 
-function TopBar({ appName, baseUrl, canRescan, rescanning, scanNote, onRescan, query, onQuery }: {
+function TopBar({ appName, target, defaultTarget, onTarget, canRescan, rescanning, scanNote, onRescan, query, onQuery }: {
   appName: string | null
-  baseUrl: string
+  target: string
+  defaultTarget: string
+  onTarget: (t: string) => void
   canRescan: boolean
   rescanning: boolean
   scanNote?: string
@@ -172,14 +204,9 @@ function TopBar({ appName, baseUrl, canRescan, rescanning, scanNote, onRescan, q
 
       <div className="ml-auto flex items-center gap-2">
         {scanNote && <span className="hidden text-xs text-emerald-600 sm:inline dark:text-emerald-400" role="status">{scanNote}</span>}
-        {baseUrl && (
-          <span className="hidden items-center gap-2 text-sm lg:flex">
-            <span className="text-muted-foreground">Target</span>
-            <span className="rounded-md border px-2.5 py-1 font-mono text-xs">{baseUrl}</span>
-          </span>
-        )}
+        <TargetEditor target={target} defaultTarget={defaultTarget} onChange={onTarget} />
         <Button variant="outline" size="sm" onClick={onRescan} disabled={!canRescan || rescanning}
-          title={canRescan ? 'Run php artisan riven:export' : 'Run serve from your Laravel app to enable this'}>
+          title={canRescan ? 'Scan the routes again' : 'Run serve from your Laravel app to enable this'}>
           <RefreshCw className={cn(rescanning && 'animate-spin')} />
           {rescanning ? 'Scanning…' : 'Rescan routes'}
         </Button>
@@ -229,3 +256,46 @@ function RouteList({ manifest, query, selectedId, latestByRoute }: {
   )
 }
 
+// TargetEditor shows where requests go and lets you point them elsewhere
+// (another port, a staging URL, a Docker service name).
+function TargetEditor({ target, defaultTarget, onChange }: { target: string; defaultTarget: string; onChange: (t: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(target)
+  const valid = /^https?:\/\/[^/\s]+/.test(draft.trim())
+  const changed = !!defaultTarget && target !== defaultTarget
+
+  function save() {
+    if (!valid) return
+    onChange(draft.trim() === defaultTarget ? '' : draft)
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); save() }}>
+        <Label htmlFor="target-url" className="text-sm text-muted-foreground">Target</Label>
+        <Input id="target-url" autoFocus value={draft} onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => e.key === 'Escape' && setEditing(false)}
+          aria-invalid={!valid} placeholder="http://localhost:8000" className="h-8 w-72 font-mono text-xs" />
+        <Button type="submit" size="sm" disabled={!valid}>Save</Button>
+        <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+      </form>
+    )
+  }
+
+  return (
+    <span className="flex items-center gap-1 text-sm">
+      <span className="hidden text-muted-foreground sm:inline">Target</span>
+      <Button variant="outline" size="sm" className="max-w-64 font-mono text-xs" title="Change where requests are sent"
+        onClick={() => { setDraft(target); setEditing(true) }}>
+        <span className="truncate">{target || 'set a target URL'}</span>
+        <Pencil className="text-muted-foreground" />
+      </Button>
+      {changed && (
+        <Button variant="ghost" size="icon" className="size-8" title={`Back to ${defaultTarget}`} aria-label="Reset target" onClick={() => onChange('')}>
+          <RotateCcw />
+        </Button>
+      )}
+    </span>
+  )
+}

@@ -1,12 +1,18 @@
 import { useEffect, useState, type ComponentProps, type MouseEvent } from 'react'
 
 // A tiny pushState router: three views don't need a router library.
-// The Go server answers index.html for unknown paths, so reloads work.
+// The server answers index.html for unknown paths, so reloads work.
+//
+// Paths inside the app ("/routes/…") are relative to where the dashboard is
+// mounted: <base href> is "/" under riven-engine serve and "/riven/" in Laravel.
+const BASE = new URL(document.baseURI).pathname.replace(/\/$/, '')
+
+const current = () => window.location.pathname.slice(BASE.length) || '/'
 
 export function usePath(): string {
-  const [path, setPath] = useState(window.location.pathname)
+  const [path, setPath] = useState(current)
   useEffect(() => {
-    const onPop = () => setPath(window.location.pathname)
+    const onPop = () => setPath(current())
     window.addEventListener('popstate', onPop)
     window.addEventListener('riven:navigate', onPop)
     return () => {
@@ -18,7 +24,7 @@ export function usePath(): string {
 }
 
 export function navigate(to: string) {
-  window.history.pushState(null, '', to)
+  window.history.pushState(null, '', BASE + to)
   window.dispatchEvent(new Event('riven:navigate'))
   window.scrollTo(0, 0)
 }
@@ -31,7 +37,7 @@ export function Link({ to, onClick, ...props }: ComponentProps<'a'> & { to: stri
     e.preventDefault()
     navigate(to)
   }
-  return <a href={to} onClick={handle} {...props} />
+  return <a href={BASE + to} onClick={handle} {...props} />
 }
 
 export const routePath = (id: string, tab?: string) => '/routes/' + encodeURIComponent(id) + (tab ? '/' + tab : '')

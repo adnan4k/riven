@@ -122,8 +122,9 @@ export interface OpenAPIDoc {
 }
 
 export interface AppConfig {
-  base_url: string
+  base_url: string // default target: --base-url, else APP_URL
   can_rescan: boolean
+  live_updates?: boolean // false: no /api/events (Laravel builds the manifest per request)
 }
 
 export interface TryResponse {

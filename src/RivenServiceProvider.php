@@ -8,6 +8,10 @@ use Riven\Commands\ExportManifestCommand;
 use Riven\Commands\FakeBodyCommand;
 use Riven\Commands\InstallEngineCommand;
 use Riven\Commands\ScanRoutesCommand;
+use Riven\Dashboard\Engine;
+use Riven\Dashboard\Reports;
+use Riven\Dashboard\StressRuns;
+use Riven\Dashboard\Ui;
 use Riven\Engine\EngineInstaller;
 use Riven\Engine\LaravelHttpClient;
 use Riven\Faking\BodyFaker;
@@ -48,14 +52,51 @@ class RivenServiceProvider extends ServiceProvider
         $this->app->bind(BodyFaker::class, fn ($app) => new BodyFaker($app->make(\Faker\Generator::class)));
 
         $this->app->bind(EngineInstaller::class, fn ($app) => new EngineInstaller(
-            target: $app['config']['riven.engine.path'] ?? $app->basePath('vendor/bin/riven-engine'.(PHP_OS_FAMILY === 'Windows' ? '.exe' : '')),
+            target: $this->enginePath(),
             http: new LaravelHttpClient,
             releasesUrl: $app['config']['riven.engine.releases_url'] ?? EngineInstaller::RELEASES_URL,
         ));
+
+        // Dashboard (APP_URL/riven)
+        $this->app->bind(Engine::class, fn () => new Engine($this->enginePath()));
+        $this->app->bind(Ui::class, fn ($app) => new Ui($app->make(Engine::class), $this->dashboardStorage()));
+        $this->app->bind(Reports::class, fn ($app) => new Reports($this->absolute($app['config']['riven.dashboard.reports'] ?? 'riven-reports')));
+        $this->app->bind(StressRuns::class, fn ($app) => new StressRuns($app->make(Engine::class), $this->dashboardStorage().'/stress', $app->make(Reports::class)));
+    }
+
+    private function enginePath(): string
+    {
+        return $this->app['config']['riven.engine.path']
+            ?? $this->app->basePath('vendor/bin/riven-engine'.(PHP_OS_FAMILY === 'Windows' ? '.exe' : ''));
+    }
+
+    private function dashboardStorage(): string
+    {
+        return $this->app['config']['riven.dashboard.storage'] ?? $this->app->storagePath('framework/riven');
+    }
+
+    private function absolute(string $path): string
+    {
+        return preg_match('#^([a-zA-Z]:)?[/\\\\]#', $path) ? $path : $this->app->basePath($path);
+    }
+
+    /**
+     * The dashboard shows the app's internals and can send load anywhere, so
+     * by default it only exists in the local environment.
+     */
+    private function dashboardEnabled(): bool
+    {
+        $enabled = $this->app['config']['riven.dashboard.enabled'];
+
+        return $enabled === null ? $this->app->environment('local') : filter_var($enabled, FILTER_VALIDATE_BOOL);
     }
 
     public function boot(): void
     {
+        if ($this->dashboardEnabled()) {
+            $this->loadRoutesFrom(__DIR__.'/../routes/riven.php');
+        }
+
         if ($this->app->runningInConsole()) {
             $this->publishes([self::CONFIG => config_path('riven.php')], 'riven-config');
 
